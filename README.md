@@ -77,4 +77,4 @@ This is a personal noncommercial study project and is not endorsed by Merriam-We
 - It does not persist Merriam-Webster definitions between browser sessions.
 - The first time a new four-choice question appears, up to four dictionary lookups may be needed.
 - Thesaurus lookup occurs only when you request it after answering.
-- A later version should add a larger vetted word bank, user-selected review rules, pronunciation, and more question types.
+- A later version should add a larger vetted word bank, user-selected review rules, pronunciation, and more question types. Vercel Git deployment initialized.
