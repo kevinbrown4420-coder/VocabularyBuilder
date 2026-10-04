@@ -90,9 +90,23 @@ footer { max-width: 800px; margin: 1rem auto; padding: 0 1rem 2rem; color: var(-
 .help-text { color: var(--muted); font-size: .92rem; margin: .55rem 0 1rem; }
 .setting-toggle { margin-top: .4rem; }
 body.focus-practice .app-header,
-body.focus-practice .tabs,
+body.focus-practice .main-menu,
 body.focus-practice footer { display: none !important; }
 body.focus-practice main { padding-top: .55rem; }
 body.focus-practice #view-practice > .row-between { margin-bottom: .35rem; }
 body.focus-practice #practiceHeading { font-size: 1.15rem; margin: 0; }
 body.focus-practice #quizArea { margin-top: .25rem; }
+
+
+/* v0.3 accessible navigation and lookup */
+.header-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.main-menu { display: grid; gap: .5rem; max-width: 800px; margin: 0 auto; padding: .75rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.main-menu button { width: 100%; text-align: left; }
+.main-menu button[aria-current="page"] { background: var(--accent); color: var(--accent-contrast); }
+.lookup-form, .lookup-result, .lookup-suggestions { background: var(--surface); border: 1px solid var(--border); border-radius: .65rem; padding: 1rem; margin: .8rem 0; }
+.lookup-form button { width: 100%; }
+.lookup-result:focus { outline: 4px solid var(--focus); outline-offset: 3px; }
+.lookup-add { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 1rem; }
+.lookup-add button { width: 100%; }
+.lookup-suggestions ul { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.lookup-suggestions button { width: 100%; text-align: left; }

@@ -17,13 +17,17 @@
       <h1>Vocabulary Tracker</h1>
       <p class="subtitle">Accessible vocabulary practice and mastery tracking</p>
     </div>
-    <button id="installButton" class="secondary hidden" type="button">Install app</button>
+    <div class="header-actions">
+      <button id="menuButton" class="secondary" type="button" aria-expanded="false" aria-controls="mainMenu">Menu</button>
+      <button id="installButton" class="secondary hidden" type="button">Install app</button>
+    </div>
   </header>
 
-  <nav aria-label="Main navigation" class="tabs">
+  <nav id="mainMenu" aria-label="Main navigation" class="main-menu hidden">
     <button type="button" data-view="home" aria-current="page">Home</button>
     <button type="button" data-view="practice">Practice</button>
-    <button type="button" data-view="words">My words</button>
+    <button type="button" data-view="lookup">Word Lookup</button>
+    <button type="button" data-view="words">My Words</button>
     <button type="button" data-view="stats">Statistics</button>
     <button type="button" data-view="settings">Settings</button>
   </nav>
@@ -42,6 +46,7 @@
       </div>
       <div class="action-stack">
         <button id="startPracticeButton" class="primary large" type="button">Start practice</button>
+        <button id="homeLookupButton" type="button">Look up a word</button>
         <button id="reviewDueButton" type="button">Review words due now</button>
         <button id="reviewMissedButton" type="button">Review difficult words</button>
       </div>
@@ -116,8 +121,43 @@
       </section>
     </section>
 
+    <section id="view-lookup" class="view hidden" aria-labelledby="lookupHeading">
+      <h2 id="lookupHeading">Word Lookup</h2>
+      <p>Look up any word recognized by your Merriam-Webster APIs. A dictionary entry can be added to your personal study list and used in future practice.</p>
+
+      <form id="lookupForm" class="lookup-form">
+        <label for="lookupWord">Word</label>
+        <input id="lookupWord" type="search" autocomplete="off" autocapitalize="none" spellcheck="true">
+        <button id="lookupButton" class="primary" type="submit">Look up word</button>
+      </form>
+      <p id="lookupStatus" role="status" aria-live="polite"></p>
+
+      <section id="lookupResult" class="lookup-result hidden" tabindex="-1" aria-labelledby="lookupResultHeading">
+        <h3 id="lookupResultHeading"></h3>
+        <p id="lookupPartOfSpeech"></p>
+        <div id="lookupDefinitions"></div>
+        <div id="lookupThesaurus"></div>
+        <div id="lookupAddControls" class="lookup-add hidden">
+          <label for="lookupLevel">Study difficulty</label>
+          <select id="lookupLevel">
+            <option value="1">Level 1: Common</option>
+            <option value="2">Level 2: Intermediate</option>
+            <option value="3" selected>Level 3: Advanced</option>
+            <option value="4">Level 4: Expert</option>
+            <option value="5">Level 5: Obscure</option>
+          </select>
+          <button id="addLookupWordButton" type="button">Add to My Words</button>
+        </div>
+      </section>
+
+      <section id="lookupSuggestions" class="lookup-suggestions hidden" aria-labelledby="lookupSuggestionsHeading">
+        <h3 id="lookupSuggestionsHeading">Suggested spellings</h3>
+        <ul id="lookupSuggestionList"></ul>
+      </section>
+    </section>
+
     <section id="view-words" class="view hidden" aria-labelledby="wordsHeading">
-      <h2 id="wordsHeading">My words</h2>
+      <h2 id="wordsHeading">My Words</h2>
       <div class="filters">
         <label for="wordSearch">Search words</label>
         <input id="wordSearch" type="search" autocomplete="off">
@@ -190,7 +230,7 @@
   </main>
 
   <footer>
-    <p>Vocabulary Tracker v0.2. Progress is stored locally on your device.</p>
+    <p>Vocabulary Tracker v0.3. Progress is stored locally on your device.</p>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

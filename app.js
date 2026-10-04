@@ -30,15 +30,49 @@
   let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3], focusedPractice:false});
   let session = null;
   let installPrompt = null;
+  let currentLookup = null;
   const transientDictionary = new Map();
   const transientThesaurus = new Map();
 
   function defaultProgress() {
     return {
       words: {},
+      customWords: [],
       totals: {answers:0, correct:0, sessions:0},
       streak: {current:0, longest:0, lastStudyDate:null}
     };
+  }
+
+  function allStudyWords() {
+    const base = WORDS.map(item => ({...item, custom:false}));
+    const known = new Set(base.map(item => item.word));
+    const custom = Array.isArray(progress.customWords) ? progress.customWords : [];
+    for (const item of custom) {
+      const word = String(item?.word || '').trim().toLowerCase();
+      const level = Math.max(1, Math.min(5, Number(item?.level) || 3));
+      if (word && !known.has(word)) {
+        base.push({word, level, custom:true});
+        known.add(word);
+      }
+    }
+    return base;
+  }
+
+  function studyWordExists(word) {
+    const normalized = String(word || '').trim().toLowerCase();
+    return allStudyWords().some(item => item.word === normalized);
+  }
+
+  function addCustomStudyWord(word, level=3) {
+    const normalized = String(word || '').trim().toLowerCase();
+    if (!normalized || studyWordExists(normalized)) return false;
+    if (!Array.isArray(progress.customWords)) progress.customWords = [];
+    progress.customWords.push({
+      word: normalized,
+      level: Math.max(1, Math.min(5, Number(level) || 3))
+    });
+    saveState();
+    return true;
   }
 
   function loadJson(key, fallback) {
@@ -156,10 +190,20 @@
     $('questionCounter').textContent = text;
   }
 
+  function setMenuOpen(open, focusFirst=false) {
+    const menu = $('mainMenu');
+    const button = $('menuButton');
+    if (!menu || !button) return;
+    menu.classList.toggle('hidden', !open);
+    button.setAttribute('aria-expanded', String(Boolean(open)));
+    if (open && focusFirst) menu.querySelector('button[data-view]')?.focus();
+  }
+
   function switchView(name, focus=true) {
     qsa('.view').forEach(v => v.classList.add('hidden'));
     $(`view-${name}`).classList.remove('hidden');
-    qsa('.tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.view===name ? 'page' : 'false'));
+    qsa('#mainMenu button[data-view]').forEach(b => b.setAttribute('aria-current', b.dataset.view===name ? 'page' : 'false'));
+    setMenuOpen(false);
     if (name === 'home') renderHome();
     if (name === 'words') renderWords();
     if (name === 'stats') renderStats();
@@ -170,7 +214,7 @@
   }
 
   function renderHome() {
-    const states = WORDS.map(({word}) => getExistingWordState(word));
+    const states = allStudyWords().map(({word}) => getExistingWordState(word));
     const seen = states.filter(s => s.seen>0);
     const mastered = seen.filter(s => s.mastery===4).length;
     const learning = seen.filter(s => s.mastery>0 && s.mastery<4).length;
@@ -212,7 +256,7 @@
     settings = {...settings, sessionSize:size, direction, levels};
     saveState();
 
-    const pool = WORDS.filter(w => levels.includes(w.level));
+    const pool = allStudyWords().filter(w => levels.includes(w.level));
     const now = Date.now();
     let candidates;
     if (mode === 'due') {
@@ -328,8 +372,175 @@
     return result;
   }
 
+  function renderLookupSuggestions(suggestions) {
+    const section = $('lookupSuggestions');
+    const list = $('lookupSuggestionList');
+    list.innerHTML = '';
+    if (!suggestions?.length) {
+      section.classList.add('hidden');
+      return;
+    }
+    suggestions.slice(0,8).forEach(suggestion => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = suggestion;
+      button.addEventListener('click', () => {
+        $('lookupWord').value = suggestion;
+        lookupWord(suggestion);
+      });
+      li.appendChild(button);
+      list.appendChild(li);
+    });
+    section.classList.remove('hidden');
+  }
+
+  function updateLookupAddControls() {
+    const controls = $('lookupAddControls');
+    const button = $('addLookupWordButton');
+    if (!currentLookup?.word) {
+      controls.classList.add('hidden');
+      return;
+    }
+    controls.classList.remove('hidden');
+    const exists = studyWordExists(currentLookup.word);
+    button.disabled = exists;
+    button.textContent = exists ? 'Already in My Words' : 'Add to My Words';
+  }
+
+  async function lookupWord(overrideWord=null) {
+    const input = $('lookupWord');
+    const raw = String(overrideWord ?? input.value).trim();
+    const word = raw.toLowerCase();
+    const status = $('lookupStatus');
+    const result = $('lookupResult');
+    currentLookup = null;
+    result.classList.add('hidden');
+    $('lookupAddControls').classList.add('hidden');
+    renderLookupSuggestions([]);
+
+    if (!word) {
+      status.textContent = 'Enter a word to look up.';
+      input.focus();
+      return;
+    }
+    if (!keys.dictionary) {
+      status.textContent = 'Your Merriam-Webster Dictionary API key is not configured. Open Settings first.';
+      return;
+    }
+
+    status.textContent = `Looking up ${raw}…`;
+    $('lookupButton').disabled = true;
+    try {
+      const data = await apiLookup('dictionary', word, keys.dictionary);
+      if (!Array.isArray(data)) throw new Error('Unexpected dictionary response.');
+
+      if (!data.some(item => item && typeof item === 'object')) {
+        const suggestions = data.filter(item => typeof item === 'string');
+        status.textContent = suggestions.length
+          ? `No exact dictionary entry was returned for ${raw}. Choose a suggested spelling below.`
+          : `No dictionary entry was returned for ${raw}.`;
+        renderLookupSuggestions(suggestions);
+        return;
+      }
+
+      const entry = data.find(item => item && typeof item === 'object' && Array.isArray(item.shortdef) && item.shortdef.length)
+        || data.find(item => item && typeof item === 'object');
+      if (!entry || !Array.isArray(entry.shortdef) || !entry.shortdef.length) {
+        status.textContent = `Merriam-Webster returned an entry for ${raw}, but it did not include a usable short definition.`;
+        return;
+      }
+
+      const displayWord = normalizeHeadword(entry.hwi?.hw) || raw;
+      const storedWord = displayWord.toLowerCase();
+      const dictionary = {
+        word: storedWord,
+        headword: displayWord,
+        partOfSpeech: entry.fl || '',
+        shortdefs: entry.shortdef.filter(Boolean).slice(0,3),
+        definition: entry.shortdef[0]
+      };
+      transientDictionary.set(storedWord, dictionary);
+      currentLookup = dictionary;
+
+      $('lookupResultHeading').textContent = displayWord;
+      $('lookupPartOfSpeech').textContent = dictionary.partOfSpeech ? `Part of speech: ${dictionary.partOfSpeech}` : '';
+      const definitions = $('lookupDefinitions');
+      definitions.innerHTML = '';
+      const heading = document.createElement('h4');
+      heading.textContent = 'Definitions';
+      definitions.appendChild(heading);
+      const ol = document.createElement('ol');
+      dictionary.shortdefs.forEach(def => {
+        const li = document.createElement('li');
+        li.textContent = def;
+        ol.appendChild(li);
+      });
+      definitions.appendChild(ol);
+
+      const thesaurusPanel = $('lookupThesaurus');
+      thesaurusPanel.innerHTML = '';
+      if (keys.thesaurus) {
+        try {
+          const thesaurus = await getThesaurus(storedWord);
+          const h = document.createElement('h4');
+          h.textContent = 'Thesaurus';
+          thesaurusPanel.appendChild(h);
+          if (thesaurus.synonyms.length) {
+            const p = document.createElement('p');
+            const strong = document.createElement('strong');
+            strong.textContent = 'Synonyms: ';
+            p.append(strong, document.createTextNode(thesaurus.synonyms.join(', ')));
+            thesaurusPanel.appendChild(p);
+          }
+          if (thesaurus.antonyms.length) {
+            const p = document.createElement('p');
+            const strong = document.createElement('strong');
+            strong.textContent = 'Antonyms: ';
+            p.append(strong, document.createTextNode(thesaurus.antonyms.join(', ')));
+            thesaurusPanel.appendChild(p);
+          }
+          if (!thesaurus.synonyms.length && !thesaurus.antonyms.length) {
+            const p = document.createElement('p');
+            p.textContent = 'No synonym or antonym list was returned for this entry.';
+            thesaurusPanel.appendChild(p);
+          }
+        } catch (error) {
+          const p = document.createElement('p');
+          p.textContent = `Thesaurus lookup was unavailable: ${error.message}`;
+          thesaurusPanel.appendChild(p);
+        }
+      } else {
+        const p = document.createElement('p');
+        p.textContent = 'Add your Thesaurus API key in Settings to see synonyms and antonyms.';
+        thesaurusPanel.appendChild(p);
+      }
+
+      updateLookupAddControls();
+      result.classList.remove('hidden');
+      status.textContent = `Lookup complete for ${displayWord}.`;
+      result.focus();
+    } catch (error) {
+      status.textContent = `Lookup failed: ${error.message}`;
+    } finally {
+      $('lookupButton').disabled = false;
+    }
+  }
+
+  function addLookupWordToStudy() {
+    if (!currentLookup?.word) return;
+    const level = Number($('lookupLevel').value) || 3;
+    if (addCustomStudyWord(currentLookup.word, level)) {
+      showToast(`${currentLookup.headword || currentLookup.word} added to My Words.`);
+      renderHome();
+      renderWords();
+      renderStats();
+    }
+    updateLookupAddControls();
+  }
+
   async function makeQuestion(item) {
-    const levelPool = WORDS.filter(w => w.word!==item.word && (w.level===item.level || Math.abs(w.level-item.level)<=1));
+    const levelPool = allStudyWords().filter(w => w.word!==item.word && (w.level===item.level || Math.abs(w.level-item.level)<=1));
     const distractorWords = shuffle(levelPool).slice(0,3);
     const allItems = [item, ...distractorWords];
     const entries = await Promise.all(allItems.map(x => getDictionary(x.word)));
@@ -520,7 +731,7 @@
     const search = $('wordSearch')?.value?.trim().toLowerCase() || '';
     const status = $('statusFilter')?.value || 'all';
     const level = $('levelFilter')?.value || 'all';
-    const items = WORDS.filter(item => {
+    const items = allStudyWords().filter(item => {
       const s = getExistingWordState(item.word);
       return (!search || item.word.includes(search)) && (status==='all' || statusOf(s)===status) && (level==='all' || String(item.level)===level);
     }).sort((a,b)=>a.word.localeCompare(b.word));
@@ -530,7 +741,9 @@
       const s = getExistingWordState(item.word);
       const li=document.createElement('li');
       const h=document.createElement('h3'); h.textContent=item.word;
-      const p1=document.createElement('p'); p1.textContent=`Level ${item.level}: ${LEVEL_NAMES[item.level]} — ${statusOf(s)}`;
+      const p1=document.createElement('p');
+      const sourceLabel = item.custom ? 'Personal word' : 'Starter word';
+      p1.textContent=`${sourceLabel}; Level ${item.level}: ${LEVEL_NAMES[item.level]} — ${statusOf(s)}`;
       const p2=document.createElement('p'); p2.textContent=s.seen ? `${s.correct} correct, ${s.wrong} incorrect; accuracy ${accuracy(s.correct,s.correct+s.wrong)}` : 'Not encountered yet.';
       li.append(h,p1,p2); list.appendChild(li);
     });
@@ -538,14 +751,15 @@
 
   function renderStats() {
     const dl = $('overallStats'); dl.innerHTML='';
-    const seenCount = WORDS.filter(({word})=>getExistingWordState(word).seen>0).length;
-    const mastered = WORDS.filter(({word})=>getExistingWordState(word).mastery===4).length;
+    const studyWords = allStudyWords();
+    const seenCount = studyWords.filter(({word})=>getExistingWordState(word).seen>0).length;
+    const mastered = studyWords.filter(({word})=>getExistingWordState(word).mastery===4).length;
     const stats = [
       ['Total answers', progress.totals.answers],
       ['Correct answers', progress.totals.correct],
       ['Overall accuracy', accuracy(progress.totals.correct,progress.totals.answers)],
       ['Completed sessions', progress.totals.sessions],
-      ['Words encountered', `${seenCount} of ${WORDS.length}`],
+      ['Words encountered', `${seenCount} of ${studyWords.length}`],
       ['Words mastered', mastered],
       ['Current study streak', `${progress.streak?.current || 0} days`],
       ['Longest study streak', `${progress.streak?.longest || 0} days`]
@@ -553,7 +767,7 @@
     stats.forEach(([k,v])=>{const dt=document.createElement('dt');dt.textContent=k;const dd=document.createElement('dd');dd.textContent=v;dl.append(dt,dd);});
     const levelStats=$('levelStats'); levelStats.innerHTML='';
     for(let level=1;level<=5;level++){
-      const words=WORDS.filter(x=>x.level===level);
+      const words=studyWords.filter(x=>x.level===level);
       const seen=words.filter(({word})=>getExistingWordState(word).seen>0);
       const masteredN=words.filter(({word})=>getExistingWordState(word).mastery===4).length;
       const c=seen.reduce((n,{word})=>n+getExistingWordState(word).correct,0);
@@ -622,14 +836,24 @@
   }
 
   function resetProgress() {
-    if(!confirm('Reset all vocabulary progress and statistics? Your API keys will be kept.')) return;
-    progress=defaultProgress(); saveState(); renderHome();renderWords();renderStats();
-    showToast('Study progress reset.');
+    if(!confirm('Reset all vocabulary progress and statistics? Your API keys and personal word list will be kept.')) return;
+    const customWords = Array.isArray(progress.customWords) ? [...progress.customWords] : [];
+    progress=defaultProgress();
+    progress.customWords = customWords;
+    saveState(); renderHome();renderWords();renderStats();
+    showToast('Study progress reset. Personal words were kept.');
   }
 
   function configureEvents() {
-    qsa('.tabs button').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+    qsa('#mainMenu button[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+    $('menuButton').addEventListener('click',()=>{
+      const open = $('menuButton').getAttribute('aria-expanded') !== 'true';
+      setMenuOpen(open, open);
+    });
     $('startPracticeButton').addEventListener('click',()=>{switchView('practice'); beginSession('normal');});
+    $('homeLookupButton').addEventListener('click',()=>switchView('lookup'));
+    $('lookupForm').addEventListener('submit',e=>{e.preventDefault();lookupWord();});
+    $('addLookupWordButton').addEventListener('click',addLookupWordToStudy);
     $('reviewDueButton').addEventListener('click',()=>{switchView('practice'); beginSession('due');});
     $('reviewMissedButton').addEventListener('click',()=>{switchView('practice'); beginSession('difficult');});
     $('beginSessionButton').addEventListener('click',()=>beginSession('normal'));
@@ -660,7 +884,9 @@
 
   function initServiceWorker() {
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
-      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+      navigator.serviceWorker.register('/sw.js', {updateViaCache:'none'})
+        .then(registration => registration.update())
+        .catch(()=>{});
     }
   }
 
