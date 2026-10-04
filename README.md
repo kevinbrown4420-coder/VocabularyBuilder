@@ -1,8 +1,8 @@
-# Vocabulary Tracker v0.2
+# Vocabulary Tracker v0.4
 
 An accessibility-first personal vocabulary trainer designed for screen-reader use. It uses Merriam-Webster API lookups for official definitions and optional thesaurus information, while storing only study progress persistently.
 
-## What v0.2 includes
+## Core features
 
 - 100 starter headwords across five app-defined difficulty tiers.
 - Four-choice practice: word → definition, definition → word, or mixed.
@@ -70,11 +70,34 @@ This is a personal noncommercial study project and is not endorsed by Merriam-We
 - `manifest.webmanifest` / `sw.js` — PWA installation and static offline shell
 - `icon-192.png` / `icon-512.png` — app icons
 
-## Known v0.2 limitations
+## Known limitations
 
 - The starter vocabulary list is curated by the app, not supplied or difficulty-rated by Merriam-Webster.
 - Pronunciation audio and usage examples are not yet surfaced.
 - It does not persist Merriam-Webster definitions between browser sessions.
 - The first time a new four-choice question appears, up to four dictionary lookups may be needed.
 - Thesaurus lookup occurs only when you request it after answering.
-- A later version should add a larger vetted word bank, user-selected review rules, pronunciation, and more question types. Vercel Git deployment initialized.
+- A later version should add a larger vetted word bank, user-selected review rules, pronunciation, and more question types.
+
+
+## v0.3 changes
+
+- Replaces the horizontally scrolling navigation tabs with a single Menu button and a vertical TalkBack-friendly menu.
+- Adds universal Merriam-Webster Word Lookup for arbitrary words recognized by the Dictionary API.
+- Displays up to three official short definitions plus thesaurus synonyms/antonyms when available.
+- Lets a recognized dictionary headword be added to My Words at a chosen study difficulty.
+- Personal words participate in practice, progress, review scheduling, statistics, export, and import.
+- Shows Merriam-Webster spelling suggestions when no exact dictionary entry is returned.
+- Uses a network-first PWA cache strategy and a v0.3 cache name to reduce stale-version problems.
+
+
+## v0.4 changes
+
+- Adds a 15-question placement check with three starter words from each difficulty level. The diagnostic does not change mastery, answer totals, session counts, or streaks.
+- Saves a recommended starting level and provides a one-button way to apply it to practice settings.
+- Adds All study words / Personal words only / Starter bank only practice sources.
+- Prioritizes new personal words during ordinary mixed-source practice so user-added vocabulary surfaces sooner.
+- Adds a Personal words quick entry point from Home and a Word source filter in My Words.
+- Makes individual thesaurus synonyms and antonyms directly addable to My Words from both Word Lookup and post-answer details.
+- Adds personal-word and placement information to Statistics.
+- Uses a v0.4 service-worker cache while preserving the existing local-storage keys for API keys, progress, settings, and personal vocabulary.

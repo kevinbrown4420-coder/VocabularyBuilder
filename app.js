@@ -27,7 +27,7 @@
 
   let keys = loadJson(KEY_STORAGE, {dictionary:'', thesaurus:''});
   let progress = loadJson(PROGRESS_STORAGE, defaultProgress());
-  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3], focusedPractice:false});
+  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3], source:'all', focusedPractice:false});
   let session = null;
   let installPrompt = null;
   let currentLookup = null;
@@ -38,6 +38,7 @@
     return {
       words: {},
       customWords: [],
+      placement: null,
       totals: {answers:0, correct:0, sessions:0},
       streak: {current:0, longest:0, lastStudyDate:null}
     };
@@ -182,6 +183,10 @@
   function updateQuestionCounter() {
     if (!session) return;
     const total = session.queue.length;
+    if (session.mode === 'placement') {
+      $('questionCounter').textContent = `Placement question ${session.index+1} of ${total}`;
+      return;
+    }
     const recycled = Math.max(0, total - session.plannedCount);
     const current = session.queue[session.index];
     let text = `Question ${session.index+1} of ${total}`;
@@ -225,14 +230,22 @@
     $('homeAccuracy').textContent = accuracy(progress.totals.correct, progress.totals.answers);
     $('homeStreak').textContent = progress.streak?.current || 0;
     $('homeSeen').textContent = seen.length;
+    const personalCount = allStudyWords().filter(item => item.custom).length;
+    $('homePersonal').textContent = personalCount;
     const ready = Boolean(keys.dictionary && keys.thesaurus);
     $('setupNotice').textContent = ready
       ? 'Reference keys are configured on this device. Practice is ready.'
       : 'Before your first practice session, open Settings and enter your two Merriam-Webster API keys.';
     $('startPracticeButton').disabled = !ready;
+    $('homePlacementButton').disabled = !keys.dictionary;
+    $('homePersonalButton').disabled = !ready || personalCount===0;
     $('reviewDueButton').disabled = !ready || due===0;
     const difficult = seen.filter(s => s.wrong>0 && (s.correct+s.wrong) && s.correct/(s.correct+s.wrong)<0.7).length;
     $('reviewMissedButton').disabled = !ready || difficult===0;
+    const placement = progress.placement;
+    $('homePlacementStatus').textContent = placement?.recommendedLevel
+      ? `Latest placement recommendation: Level ${placement.recommendedLevel}: ${LEVEL_NAMES[placement.recommendedLevel]}.`
+      : 'No placement check completed yet.';
   }
 
   function renderPracticeSetup() {
@@ -240,12 +253,43 @@
     $('quizArea').classList.add('hidden');
     $('sessionComplete').classList.add('hidden');
     $('endSessionButton').classList.add('hidden');
+    $('placementApplyButton').classList.add('hidden');
+    $('anotherSessionButton').classList.remove('hidden');
+    $('anotherSessionButton').textContent = 'Start another session';
     $('sessionSize').value = String(settings.sessionSize || 10);
     $('questionDirection').value = settings.direction || 'word-def';
+    $('practiceSource').value = settings.source || 'all';
     qsa('input[name="level"]').forEach(cb => cb.checked = (settings.levels || [1,2,3]).includes(Number(cb.value)));
   }
 
   function buildSession(mode='normal') {
+    if (mode === 'placement') {
+      const selected = [];
+      for (let level=1; level<=5; level++) {
+        selected.push(...shuffle(WORDS.filter(item => item.level===level)).slice(0,3));
+      }
+      return {
+        mode:'placement',
+        queue:shuffle(selected).map(w => ({...w, custom:false, repeat:false})),
+        index:0,
+        answered:0,
+        correct:0,
+        current:null,
+        completed:false,
+        direction:'word-def',
+        levels:[1,2,3,4,5],
+        source:'starter',
+        plannedCount:selected.length,
+        placementResults:{
+          1:{answered:0,correct:0},
+          2:{answered:0,correct:0},
+          3:{answered:0,correct:0},
+          4:{answered:0,correct:0},
+          5:{answered:0,correct:0}
+        }
+      };
+    }
+
     const levels = qsa('input[name="level"]:checked').map(cb => Number(cb.value));
     if (!levels.length) {
       showToast('Select at least one difficulty level.');
@@ -253,10 +297,14 @@
     }
     const size = Number($('sessionSize').value);
     const direction = $('questionDirection').value;
-    settings = {...settings, sessionSize:size, direction, levels};
+    const source = $('practiceSource').value || 'all';
+    settings = {...settings, sessionSize:size, direction, levels, source};
     saveState();
 
-    const pool = allStudyWords().filter(w => levels.includes(w.level));
+    let pool = allStudyWords().filter(w => levels.includes(w.level));
+    if (source === 'personal') pool = pool.filter(w => w.custom);
+    if (source === 'starter') pool = pool.filter(w => !w.custom);
+
     const now = Date.now();
     let candidates;
     if (mode === 'due') {
@@ -278,7 +326,13 @@
         const s=getExistingWordState(word); return s.seen>0 && s.mastery<4 && !(s.nextDue && s.nextDue<=now);
       });
       const mastered = pool.filter(({word}) => getExistingWordState(word).mastery===4);
-      candidates = [...shuffle(due), ...shuffle(fresh), ...shuffle(continuing), ...shuffle(mastered)];
+      const prioritizePersonal = items => [...shuffle(items.filter(x=>x.custom)), ...shuffle(items.filter(x=>!x.custom))];
+      candidates = [
+        ...prioritizePersonal(due),
+        ...prioritizePersonal(fresh),
+        ...prioritizePersonal(continuing),
+        ...prioritizePersonal(mastered)
+      ];
     }
     const unique = [];
     const seenWords = new Set();
@@ -287,7 +341,9 @@
     }
     const selected = unique.slice(0, Math.min(size, unique.length));
     if (!selected.length) {
-      showToast(mode==='due' ? 'No words are due in the selected levels.' : 'No matching words are available.');
+      const sourceMessage = source==='personal' ? 'No personal words match the selected levels.' :
+        (mode==='due' ? 'No words are due in the selected levels.' : 'No matching words are available.');
+      showToast(sourceMessage);
       return null;
     }
     return {
@@ -300,6 +356,7 @@
       completed:false,
       direction,
       levels,
+      source,
       plannedCount:selected.length
     };
   }
@@ -370,6 +427,62 @@
     const result = {synonyms:unique(syns).slice(0,12), antonyms:unique(ants).slice(0,12)};
     transientThesaurus.set(word, result);
     return result;
+  }
+
+  function addRelatedWord(word, level, button) {
+    const normalized = String(word || '').trim().toLowerCase();
+    if (!normalized) return;
+    if (addCustomStudyWord(normalized, level)) {
+      showToast(`${word} added to My Words at Level ${level}.`);
+      renderHome();
+      renderWords();
+      renderStats();
+    }
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'In My Words';
+    }
+  }
+
+  function appendThesaurusWordGroup(panel, label, words, getLevel) {
+    if (!words?.length) return;
+    const section = document.createElement('section');
+    section.className = 'thesaurus-group';
+    const h = document.createElement('h5');
+    h.textContent = label;
+    section.appendChild(h);
+    const ul = document.createElement('ul');
+    ul.className = 'thesaurus-word-list';
+    words.forEach(word => {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = word;
+      const button = document.createElement('button');
+      button.type = 'button';
+      const exists = studyWordExists(word);
+      button.disabled = exists;
+      button.textContent = exists ? 'In My Words' : 'Add to My Words';
+      button.setAttribute('aria-label', exists ? `${word} is already in My Words` : `Add ${word} to My Words`);
+      button.addEventListener('click', () => addRelatedWord(word, Number(getLevel()) || 3, button));
+      li.append(span, button);
+      ul.appendChild(li);
+    });
+    section.appendChild(ul);
+    panel.appendChild(section);
+  }
+
+  function renderThesaurusWithAdd(panel, thesaurus, getLevel) {
+    panel.innerHTML = '';
+    const h = document.createElement('h4');
+    h.textContent = 'Thesaurus';
+    panel.appendChild(h);
+    appendThesaurusWordGroup(panel, 'Synonyms', thesaurus.synonyms, getLevel);
+    appendThesaurusWordGroup(panel, 'Antonyms', thesaurus.antonyms, getLevel);
+    if (!thesaurus.synonyms.length && !thesaurus.antonyms.length) {
+      const p = document.createElement('p');
+      p.textContent = 'No synonym or antonym list was returned for this entry.';
+      panel.appendChild(p);
+    }
   }
 
   function renderLookupSuggestions(suggestions) {
@@ -483,28 +596,7 @@
       if (keys.thesaurus) {
         try {
           const thesaurus = await getThesaurus(storedWord);
-          const h = document.createElement('h4');
-          h.textContent = 'Thesaurus';
-          thesaurusPanel.appendChild(h);
-          if (thesaurus.synonyms.length) {
-            const p = document.createElement('p');
-            const strong = document.createElement('strong');
-            strong.textContent = 'Synonyms: ';
-            p.append(strong, document.createTextNode(thesaurus.synonyms.join(', ')));
-            thesaurusPanel.appendChild(p);
-          }
-          if (thesaurus.antonyms.length) {
-            const p = document.createElement('p');
-            const strong = document.createElement('strong');
-            strong.textContent = 'Antonyms: ';
-            p.append(strong, document.createTextNode(thesaurus.antonyms.join(', ')));
-            thesaurusPanel.appendChild(p);
-          }
-          if (!thesaurus.synonyms.length && !thesaurus.antonyms.length) {
-            const p = document.createElement('p');
-            p.textContent = 'No synonym or antonym list was returned for this entry.';
-            thesaurusPanel.appendChild(p);
-          }
+          renderThesaurusWithAdd(thesaurusPanel, thesaurus, () => Number($('lookupLevel').value) || 3);
         } catch (error) {
           const p = document.createElement('p');
           p.textContent = `Thesaurus lookup was unavailable: ${error.message}`;
@@ -540,7 +632,8 @@
   }
 
   async function makeQuestion(item) {
-    const levelPool = allStudyWords().filter(w => w.word!==item.word && (w.level===item.level || Math.abs(w.level-item.level)<=1));
+    const questionPool = session?.mode === 'placement' ? WORDS.map(w => ({...w, custom:false})) : allStudyWords();
+    const levelPool = questionPool.filter(w => w.word!==item.word && (w.level===item.level || Math.abs(w.level-item.level)<=1));
     const distractorWords = shuffle(levelPool).slice(0,3);
     const allItems = [item, ...distractorWords];
     const entries = await Promise.all(allItems.map(x => getDictionary(x.word)));
@@ -609,9 +702,17 @@
     session.current.answered = true;
     const q = session.current;
     const isCorrect = option.correct;
+    const isPlacement = session.mode === 'placement';
     session.answered += 1;
     if (isCorrect) session.correct += 1;
-    updateWordProgress(q.item.word, isCorrect);
+
+    if (isPlacement) {
+      const levelResult = session.placementResults[q.item.level];
+      levelResult.answered += 1;
+      if (isCorrect) levelResult.correct += 1;
+    } else {
+      updateWordProgress(q.item.word, isCorrect);
+    }
 
     qsa('.answer-button').forEach(b => {
       b.disabled = true;
@@ -623,11 +724,13 @@
     if (!isCorrect) {
       button.classList.add('incorrect-answer');
       button.textContent += ' — your answer';
-      const repeatExists = session.queue.slice(session.index+1).some(x => x.word===q.item.word && x.repeat);
-      if (!repeatExists) {
-        const insertAt = Math.min(session.queue.length, session.index + 5);
-        session.queue.splice(insertAt, 0, {...q.item, repeat:true});
-        showToast(`${q.item.word} will return later for review.`);
+      if (!isPlacement) {
+        const repeatExists = session.queue.slice(session.index+1).some(x => x.word===q.item.word && x.repeat);
+        if (!repeatExists) {
+          const insertAt = Math.min(session.queue.length, session.index + 5);
+          session.queue.splice(insertAt, 0, {...q.item, repeat:true});
+          showToast(`${q.item.word} will return later for review.`);
+        }
       }
     }
 
@@ -636,22 +739,33 @@
     panel.className = `feedback ${isCorrect ? 'correct' : 'incorrect'}`;
     panel.classList.remove('hidden');
     $('feedbackHeading').textContent = isCorrect ? 'Correct' : 'Incorrect';
-    $('feedbackText').textContent = isCorrect
-      ? `${q.item.word}: ${q.target.definition}`
-      : `The correct answer is ${q.direction==='word-def' ? q.target.definition : q.item.word}. This word will return later in this session.`;
+    if (isPlacement) {
+      $('feedbackText').textContent = isCorrect
+        ? `${q.item.word}: ${q.target.definition}`
+        : `The correct answer is ${q.target.definition}. Placement answers do not change your mastery record.`;
+    } else {
+      $('feedbackText').textContent = isCorrect
+        ? `${q.item.word}: ${q.target.definition}`
+        : `The correct answer is ${q.direction==='word-def' ? q.target.definition : q.item.word}. This word will return later in this session.`;
+    }
     $('wordFacts').innerHTML = '';
     addFact('Word', q.target.headword || q.item.word);
     if (q.target.partOfSpeech) addFact('Part of speech', q.target.partOfSpeech);
-    addFact('Mastery', statusOf(state));
-    addFact('Record', `${state.correct} correct, ${state.wrong} incorrect`);
-    $('detailsButton').classList.remove('hidden');
-    $('detailsButton').textContent = 'Show synonyms and antonyms';
-    $('detailsButton').disabled = false;
+    if (isPlacement) {
+      addFact('Placement', 'Does not affect mastery or study statistics');
+      $('detailsButton').classList.add('hidden');
+    } else {
+      addFact('Mastery', statusOf(state));
+      addFact('Record', `${state.correct} correct, ${state.wrong} incorrect`);
+      $('detailsButton').classList.remove('hidden');
+      $('detailsButton').textContent = 'Show synonyms and antonyms';
+      $('detailsButton').disabled = false;
+    }
     $('nextQuestionButton').textContent = 'Next question';
     $('nextQuestionButton').onclick = nextQuestion;
     updateQuestionCounter();
     panel.focus();
-    renderHome();
+    if (!isPlacement) renderHome();
   }
 
   function addFact(term, value) {
@@ -662,7 +776,7 @@
   }
 
   async function showDetails() {
-    if (!session?.current) return;
+    if (!session?.current || session.mode === 'placement') return;
     const q = session.current;
     const button = $('detailsButton');
     button.disabled = true;
@@ -674,14 +788,8 @@
       const t = await getThesaurus(q.item.word);
       panel.innerHTML = '';
       const h = document.createElement('h4'); h.textContent = `Thesaurus for ${q.item.word}`; panel.appendChild(h);
-      if (t.synonyms.length) {
-        const p = document.createElement('p'); p.innerHTML = '<strong>Synonyms:</strong> ';
-        p.append(document.createTextNode(t.synonyms.join(', '))); panel.appendChild(p);
-      }
-      if (t.antonyms.length) {
-        const p = document.createElement('p'); p.innerHTML = '<strong>Antonyms:</strong> ';
-        p.append(document.createTextNode(t.antonyms.join(', '))); panel.appendChild(p);
-      }
+      appendThesaurusWordGroup(panel, 'Synonyms', t.synonyms, () => q.item.level || 3);
+      appendThesaurusWordGroup(panel, 'Antonyms', t.antonyms, () => q.item.level || 3);
       if (!t.synonyms.length && !t.antonyms.length) panel.append('No synonym or antonym list was returned for this word.');
       button.textContent = 'Synonyms and antonyms shown';
     } catch (e) {
@@ -697,15 +805,67 @@
     presentQuestion();
   }
 
+  function placementRecommendation(results) {
+    for (let level=1; level<=5; level++) {
+      const result = results[level] || {answered:0,correct:0};
+      const ratio = result.answered ? result.correct/result.answered : 0;
+      if (ratio < 2/3) return level;
+    }
+    return 5;
+  }
+
+  function finishPlacementSession(summary) {
+    const recommendedLevel = placementRecommendation(summary.placementResults);
+    const scores = {};
+    const scoreText = [];
+    for (let level=1; level<=5; level++) {
+      const result = summary.placementResults[level] || {answered:0,correct:0};
+      scores[level] = {answered:result.answered, correct:result.correct};
+      scoreText.push(`Level ${level}: ${result.correct} of ${result.answered}`);
+    }
+    progress.placement = {
+      completedAt:new Date().toISOString(),
+      recommendedLevel,
+      scores
+    };
+    saveState();
+    $('quizArea').classList.add('hidden');
+    $('endSessionButton').classList.add('hidden');
+    $('sessionComplete').classList.remove('hidden');
+    $('sessionSummary').textContent = `Placement complete. ${scoreText.join('; ')}. Recommended starting point: Level ${recommendedLevel}: ${LEVEL_NAMES[recommendedLevel]}. This quick estimate did not change mastery or study statistics.`;
+    $('anotherSessionButton').classList.add('hidden');
+    $('placementApplyButton').classList.remove('hidden');
+    setFocusedPracticeActive(false);
+    $('sessionComplete').focus();
+    session = null;
+    renderHome();
+    renderStats();
+  }
+
+  function applyPlacementRecommendation() {
+    const level = Number(progress.placement?.recommendedLevel);
+    if (!level) return;
+    settings = {...settings, levels:[level], source:'all'};
+    saveState();
+    renderPracticeSetup();
+    showToast(`Practice set to Level ${level}: ${LEVEL_NAMES[level]}.`);
+  }
+
   function finishSession() {
     if (!session) return;
     const summary = session;
+    if (summary.mode === 'placement') {
+      finishPlacementSession(summary);
+      return;
+    }
     progress.totals.sessions += 1;
     saveState();
     session.completed = true;
     $('quizArea').classList.add('hidden');
     $('endSessionButton').classList.add('hidden');
     $('sessionComplete').classList.remove('hidden');
+    $('placementApplyButton').classList.add('hidden');
+    $('anotherSessionButton').classList.remove('hidden');
     const recycled = Math.max(0, summary.queue.length - summary.plannedCount);
     const composition = recycled
       ? `${summary.plannedCount} planned plus ${recycled} recycled review${recycled===1?'':'s'}`
@@ -720,7 +880,9 @@
 
   function endSession() {
     if (!session) return;
-    const ok = confirm('End this session now? Answers already completed will remain in your progress.');
+    const ok = confirm(session.mode === 'placement'
+      ? 'End the placement check now? An incomplete placement result will not be saved.'
+      : 'End this session now? Answers already completed will remain in your progress.');
     if (!ok) return;
     session = null;
     setFocusedPracticeActive(false);
@@ -731,9 +893,11 @@
     const search = $('wordSearch')?.value?.trim().toLowerCase() || '';
     const status = $('statusFilter')?.value || 'all';
     const level = $('levelFilter')?.value || 'all';
+    const source = $('sourceFilter')?.value || 'all';
     const items = allStudyWords().filter(item => {
       const s = getExistingWordState(item.word);
-      return (!search || item.word.includes(search)) && (status==='all' || statusOf(s)===status) && (level==='all' || String(item.level)===level);
+      const sourceMatch = source==='all' || (source==='personal' && item.custom) || (source==='starter' && !item.custom);
+      return (!search || item.word.includes(search)) && sourceMatch && (status==='all' || statusOf(s)===status) && (level==='all' || String(item.level)===level);
     }).sort((a,b)=>a.word.localeCompare(b.word));
     $('wordListSummary').textContent = `${items.length} words shown.`;
     const list = $('wordList'); list.innerHTML='';
@@ -754,6 +918,10 @@
     const studyWords = allStudyWords();
     const seenCount = studyWords.filter(({word})=>getExistingWordState(word).seen>0).length;
     const mastered = studyWords.filter(({word})=>getExistingWordState(word).mastery===4).length;
+    const personalCount = studyWords.filter(item=>item.custom).length;
+    const placementText = progress.placement?.recommendedLevel
+      ? `Level ${progress.placement.recommendedLevel}: ${LEVEL_NAMES[progress.placement.recommendedLevel]}`
+      : 'Not completed';
     const stats = [
       ['Total answers', progress.totals.answers],
       ['Correct answers', progress.totals.correct],
@@ -761,6 +929,8 @@
       ['Completed sessions', progress.totals.sessions],
       ['Words encountered', `${seenCount} of ${studyWords.length}`],
       ['Words mastered', mastered],
+      ['Personal words', personalCount],
+      ['Placement recommendation', placementText],
       ['Current study streak', `${progress.streak?.current || 0} days`],
       ['Longest study streak', `${progress.streak?.longest || 0} days`]
     ];
@@ -851,18 +1021,27 @@
       setMenuOpen(open, open);
     });
     $('startPracticeButton').addEventListener('click',()=>{switchView('practice'); beginSession('normal');});
+    $('homePlacementButton').addEventListener('click',()=>{switchView('practice'); beginSession('placement');});
+    $('homePersonalButton').addEventListener('click',()=>{
+      settings={...settings, source:'personal', levels:[1,2,3,4,5]};
+      saveState();
+      switchView('practice');
+    });
     $('homeLookupButton').addEventListener('click',()=>switchView('lookup'));
     $('lookupForm').addEventListener('submit',e=>{e.preventDefault();lookupWord();});
     $('addLookupWordButton').addEventListener('click',addLookupWordToStudy);
     $('reviewDueButton').addEventListener('click',()=>{switchView('practice'); beginSession('due');});
     $('reviewMissedButton').addEventListener('click',()=>{switchView('practice'); beginSession('difficult');});
+    $('placementButton').addEventListener('click',()=>beginSession('placement'));
     $('beginSessionButton').addEventListener('click',()=>beginSession('normal'));
     $('endSessionButton').addEventListener('click',endSession);
     $('anotherSessionButton').addEventListener('click',()=>renderPracticeSetup());
+    $('placementApplyButton').addEventListener('click',applyPlacementRecommendation);
     $('detailsButton').addEventListener('click',showDetails);
     $('wordSearch').addEventListener('input',renderWords);
     $('statusFilter').addEventListener('change',renderWords);
     $('levelFilter').addEventListener('change',renderWords);
+    $('sourceFilter').addEventListener('change',renderWords);
     $('showKeys').addEventListener('change',e=>{
       const type=e.target.checked?'text':'password';$('dictionaryKey').type=type;$('thesaurusKey').type=type;
     });

@@ -43,9 +43,13 @@
         <div class="stat-card"><span class="stat-number" id="homeAccuracy">—</span><span>Accuracy</span></div>
         <div class="stat-card"><span class="stat-number" id="homeStreak">0</span><span>Day streak</span></div>
         <div class="stat-card"><span class="stat-number" id="homeSeen">0</span><span>Words encountered</span></div>
+        <div class="stat-card"><span class="stat-number" id="homePersonal">0</span><span>Personal words</span></div>
       </div>
+      <p id="homePlacementStatus" class="notice">No placement check completed yet.</p>
       <div class="action-stack">
         <button id="startPracticeButton" class="primary large" type="button">Start practice</button>
+        <button id="homePlacementButton" type="button">Run 15-question placement check</button>
+        <button id="homePersonalButton" type="button">Practice personal words</button>
         <button id="homeLookupButton" type="button">Look up a word</button>
         <button id="reviewDueButton" type="button">Review words due now</button>
         <button id="reviewMissedButton" type="button">Review difficult words</button>
@@ -76,6 +80,12 @@
           <label><input type="checkbox" name="level" value="4"> Level 4: Expert</label>
           <label><input type="checkbox" name="level" value="5"> Level 5: Obscure</label>
         </fieldset>
+        <label for="practiceSource">Study source</label>
+        <select id="practiceSource">
+          <option value="all" selected>All study words</option>
+          <option value="personal">Personal words only</option>
+          <option value="starter">Starter bank only</option>
+        </select>
         <label for="sessionSize">Questions per session</label>
         <select id="sessionSize">
           <option value="5">5</option>
@@ -90,7 +100,9 @@
           <option value="mixed">Mixed</option>
         </select>
         <button id="beginSessionButton" class="primary large" type="button">Begin session</button>
-        <p class="help-text">If you miss a word, it may return later in the same session. Recycled review questions can increase the final question count.</p>
+        <button id="placementButton" type="button">Run 15-question placement check</button>
+        <p class="help-text">Normal practice prioritizes newly added personal words when All study words is selected. If you miss a word, it may return later in the same session.</p>
+        <p class="help-text">The placement check uses three starter words from each difficulty level. It estimates a starting level and does not change mastery or study statistics.</p>
       </div>
 
       <div id="quizArea" class="hidden">
@@ -117,7 +129,10 @@
       <section id="sessionComplete" class="hidden" tabindex="-1" aria-labelledby="completeHeading">
         <h3 id="completeHeading">Session complete</h3>
         <p id="sessionSummary"></p>
-        <button id="anotherSessionButton" class="primary" type="button">Start another session</button>
+        <div class="action-stack compact">
+          <button id="placementApplyButton" class="primary hidden" type="button">Practice at recommended level</button>
+          <button id="anotherSessionButton" class="primary" type="button">Start another session</button>
+        </div>
       </section>
     </section>
 
@@ -136,7 +151,6 @@
         <h3 id="lookupResultHeading"></h3>
         <p id="lookupPartOfSpeech"></p>
         <div id="lookupDefinitions"></div>
-        <div id="lookupThesaurus"></div>
         <div id="lookupAddControls" class="lookup-add hidden">
           <label for="lookupLevel">Study difficulty</label>
           <select id="lookupLevel">
@@ -147,7 +161,9 @@
             <option value="5">Level 5: Obscure</option>
           </select>
           <button id="addLookupWordButton" type="button">Add to My Words</button>
+          <p class="help-text">Synonyms and antonyms below can also be added individually. They use the difficulty selected here.</p>
         </div>
+        <div id="lookupThesaurus"></div>
       </section>
 
       <section id="lookupSuggestions" class="lookup-suggestions hidden" aria-labelledby="lookupSuggestionsHeading">
@@ -161,6 +177,12 @@
       <div class="filters">
         <label for="wordSearch">Search words</label>
         <input id="wordSearch" type="search" autocomplete="off">
+        <label for="sourceFilter">Word source</label>
+        <select id="sourceFilter">
+          <option value="all">All words</option>
+          <option value="personal">Personal words</option>
+          <option value="starter">Starter words</option>
+        </select>
         <label for="statusFilter">Mastery status</label>
         <select id="statusFilter">
           <option value="all">All</option>
@@ -230,7 +252,7 @@
   </main>
 
   <footer>
-    <p>Vocabulary Tracker v0.3. Progress is stored locally on your device.</p>
+    <p>Vocabulary Tracker v0.4. Progress is stored locally on your device.</p>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

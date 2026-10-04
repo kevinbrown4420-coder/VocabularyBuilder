@@ -110,3 +110,17 @@ body.focus-practice #quizArea { margin-top: .25rem; }
 .lookup-add button { width: 100%; }
 .lookup-suggestions ul { list-style: none; padding: 0; display: grid; gap: .5rem; }
 .lookup-suggestions button { width: 100%; text-align: left; }
+
+
+/* v0.4 placement, personal practice, and thesaurus actions */
+.thesaurus-group { margin-top: .9rem; }
+.thesaurus-group h5 { margin: 0 0 .45rem; font-size: 1rem; }
+.thesaurus-word-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.thesaurus-word-list li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .65rem; align-items: center; border: 1px solid var(--border); border-radius: .55rem; padding: .55rem; }
+.thesaurus-word-list span { overflow-wrap: anywhere; }
+.thesaurus-word-list button { min-height: 44px; }
+#homePlacementStatus { margin-top: .8rem; }
+@media (max-width: 480px) {
+  .thesaurus-word-list li { grid-template-columns: 1fr; }
+  .thesaurus-word-list button { width: 100%; text-align: left; }
+}
