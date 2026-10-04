@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#14324a">
+  <meta name="description" content="Accessible vocabulary practice with persistent progress tracking.">
+  <title>Vocabulary Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="icon-192.png">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="app-header">
+    <div>
+      <h1>Vocabulary Tracker</h1>
+      <p class="subtitle">Accessible vocabulary practice and mastery tracking</p>
+    </div>
+    <button id="installButton" class="secondary hidden" type="button">Install app</button>
+  </header>
+
+  <nav aria-label="Main navigation" class="tabs">
+    <button type="button" data-view="home" aria-current="page">Home</button>
+    <button type="button" data-view="practice">Practice</button>
+    <button type="button" data-view="words">My words</button>
+    <button type="button" data-view="stats">Statistics</button>
+    <button type="button" data-view="settings">Settings</button>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <section id="view-home" class="view" aria-labelledby="homeHeading">
+      <h2 id="homeHeading">Home</h2>
+      <div id="setupNotice" class="notice" role="status"></div>
+      <div class="stat-grid" aria-label="Current progress">
+        <div class="stat-card"><span class="stat-number" id="homeMastered">0</span><span>Mastered</span></div>
+        <div class="stat-card"><span class="stat-number" id="homeLearning">0</span><span>Learning</span></div>
+        <div class="stat-card"><span class="stat-number" id="homeDue">0</span><span>Review due</span></div>
+        <div class="stat-card"><span class="stat-number" id="homeAccuracy">—</span><span>Accuracy</span></div>
+        <div class="stat-card"><span class="stat-number" id="homeStreak">0</span><span>Day streak</span></div>
+        <div class="stat-card"><span class="stat-number" id="homeSeen">0</span><span>Words encountered</span></div>
+      </div>
+      <div class="action-stack">
+        <button id="startPracticeButton" class="primary large" type="button">Start practice</button>
+        <button id="reviewDueButton" type="button">Review words due now</button>
+        <button id="reviewMissedButton" type="button">Review difficult words</button>
+      </div>
+      <h3>Difficulty tiers</h3>
+      <p>The five tiers are assigned by this app for study organization. They are not Merriam-Webster difficulty ratings.</p>
+      <ol>
+        <li>Common</li>
+        <li>Intermediate</li>
+        <li>Advanced</li>
+        <li>Expert</li>
+        <li>Obscure</li>
+      </ol>
+    </section>
+
+    <section id="view-practice" class="view hidden" aria-labelledby="practiceHeading">
+      <div class="row-between">
+        <h2 id="practiceHeading">Practice</h2>
+        <button id="endSessionButton" class="secondary hidden" type="button">End session</button>
+      </div>
+
+      <div id="practiceSetup">
+        <fieldset>
+          <legend>Difficulty levels</legend>
+          <label><input type="checkbox" name="level" value="1" checked> Level 1: Common</label>
+          <label><input type="checkbox" name="level" value="2" checked> Level 2: Intermediate</label>
+          <label><input type="checkbox" name="level" value="3" checked> Level 3: Advanced</label>
+          <label><input type="checkbox" name="level" value="4"> Level 4: Expert</label>
+          <label><input type="checkbox" name="level" value="5"> Level 5: Obscure</label>
+        </fieldset>
+        <label for="sessionSize">Questions per session</label>
+        <select id="sessionSize">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+        </select>
+        <label for="questionDirection">Question style</label>
+        <select id="questionDirection">
+          <option value="word-def" selected>Word to definition</option>
+          <option value="def-word">Definition to word</option>
+          <option value="mixed">Mixed</option>
+        </select>
+        <button id="beginSessionButton" class="primary large" type="button">Begin session</button>
+        <p class="help-text">If you miss a word, it may return later in the same session. Recycled review questions can increase the final question count.</p>
+      </div>
+
+      <div id="quizArea" class="hidden">
+        <p id="questionCounter" class="counter" aria-live="polite" aria-atomic="true"></p>
+        <div id="loadingQuestion" class="notice hidden" role="status">Loading official dictionary entries…</div>
+        <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
+          <p id="questionType" class="eyebrow"></p>
+          <h3 id="questionPrompt" tabindex="-1"></h3>
+          <div id="answerChoices" class="answers" role="group" aria-label="Answer choices"></div>
+        </article>
+
+        <section id="feedbackPanel" class="feedback hidden" role="region" tabindex="-1" aria-live="polite" aria-atomic="true" aria-labelledby="feedbackHeading">
+          <h3 id="feedbackHeading"></h3>
+          <p id="feedbackText"></p>
+          <dl id="wordFacts" class="facts"></dl>
+          <div class="action-stack compact">
+            <button id="detailsButton" type="button">Show synonyms and antonyms</button>
+            <button id="nextQuestionButton" class="primary" type="button">Next question</button>
+          </div>
+          <div id="detailsPanel" class="details hidden" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <section id="sessionComplete" class="hidden" tabindex="-1" aria-labelledby="completeHeading">
+        <h3 id="completeHeading">Session complete</h3>
+        <p id="sessionSummary"></p>
+        <button id="anotherSessionButton" class="primary" type="button">Start another session</button>
+      </section>
+    </section>
+
+    <section id="view-words" class="view hidden" aria-labelledby="wordsHeading">
+      <h2 id="wordsHeading">My words</h2>
+      <div class="filters">
+        <label for="wordSearch">Search words</label>
+        <input id="wordSearch" type="search" autocomplete="off">
+        <label for="statusFilter">Mastery status</label>
+        <select id="statusFilter">
+          <option value="all">All</option>
+          <option value="New">New</option>
+          <option value="Learning">Learning</option>
+          <option value="Familiar">Familiar</option>
+          <option value="Strong">Strong</option>
+          <option value="Mastered">Mastered</option>
+        </select>
+        <label for="levelFilter">Difficulty</label>
+        <select id="levelFilter">
+          <option value="all">All levels</option>
+          <option value="1">Level 1</option>
+          <option value="2">Level 2</option>
+          <option value="3">Level 3</option>
+          <option value="4">Level 4</option>
+          <option value="5">Level 5</option>
+        </select>
+      </div>
+      <p id="wordListSummary" role="status"></p>
+      <ul id="wordList" class="word-list"></ul>
+    </section>
+
+    <section id="view-stats" class="view hidden" aria-labelledby="statsHeading">
+      <h2 id="statsHeading">Statistics</h2>
+      <dl id="overallStats" class="stats-list"></dl>
+      <h3>By difficulty level</h3>
+      <div id="levelStats"></div>
+    </section>
+
+    <section id="view-settings" class="view hidden" aria-labelledby="settingsHeading">
+      <h2 id="settingsHeading">Settings</h2>
+      <p>Your API keys are stored only in this browser's local storage. This app sends them to its own same-origin proxy, which immediately forwards the requested lookup to Merriam-Webster and does not intentionally save the key or response.</p>
+      <div class="settings-form">
+        <label for="dictionaryKey">Merriam-Webster Collegiate Dictionary API key</label>
+        <input id="dictionaryKey" type="password" autocomplete="off" spellcheck="false">
+        <label for="thesaurusKey">Merriam-Webster Collegiate Thesaurus API key</label>
+        <input id="thesaurusKey" type="password" autocomplete="off" spellcheck="false">
+        <label class="inline"><input id="showKeys" type="checkbox"> Show API keys</label>
+        <div class="action-row">
+          <button id="saveKeysButton" class="primary" type="button">Save keys on this device</button>
+          <button id="testKeysButton" type="button">Test both keys</button>
+        </div>
+        <p id="keyStatus" role="status"></p>
+      </div>
+
+      <h3>Accessibility and navigation</h3>
+      <label class="inline setting-toggle"><input id="focusedPractice" type="checkbox"> Focused Practice mode</label>
+      <p class="help-text">When enabled, the app header, main navigation, and footer are hidden only while a practice session is active. This reduces extra swipe targets without changing the question or feedback controls.</p>
+
+      <h3>Progress backup</h3>
+      <p>Backups contain your study progress and settings, but never your API keys.</p>
+      <div class="action-stack compact">
+        <button id="exportProgressButton" type="button">Export progress backup</button>
+        <label for="importProgressInput" class="file-label">Import progress backup</label>
+        <input id="importProgressInput" type="file" accept="application/json,.json">
+        <button id="resetProgressButton" class="danger" type="button">Reset all study progress</button>
+      </div>
+
+      <h3>About the reference content</h3>
+      <div class="mw-branding">
+        <img src="https://dictionaryapi.com/images/info/branding-guidelines/MWLogo_LightBG_120x120_2x.png" width="100" height="100" alt="Merriam-Webster logo">
+        <p>Definitions are retrieved from Merriam-Webster's Collegiate<sup>®</sup> Dictionary with Audio. Synonyms and antonyms are retrieved from Merriam-Webster's Collegiate<sup>®</sup> Thesaurus. This personal study app is not endorsed by Merriam-Webster Inc.</p>
+      </div>
+      <p><a href="https://dictionaryapi.com/" target="_blank" rel="noopener">Merriam-Webster Dictionary API Developer Center</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Vocabulary Tracker v0.2. Progress is stored locally on your device.</p>
+  </footer>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
