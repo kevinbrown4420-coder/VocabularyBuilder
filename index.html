@@ -36,6 +36,7 @@
     <section id="view-home" class="view" aria-labelledby="homeHeading">
       <h2 id="homeHeading">Home</h2>
       <div id="setupNotice" class="notice" role="status"></div>
+      <p id="versionNotice" class="notice hidden" role="status"></p>
       <div class="stat-grid" aria-label="Current progress">
         <div class="stat-card"><span class="stat-number" id="homeMastered">0</span><span>Mastered</span></div>
         <div class="stat-card"><span class="stat-number" id="homeLearning">0</span><span>Learning</span></div>
@@ -47,6 +48,7 @@
       </div>
       <p id="homePlacementStatus" class="notice">No placement check completed yet.</p>
       <div class="action-stack">
+        <button id="resumeSessionButton" class="primary large hidden" type="button">Resume unfinished session</button>
         <button id="startPracticeButton" class="primary large" type="button">Start practice</button>
         <button id="homePlacementButton" type="button">Run 15-question placement check</button>
         <button id="homePersonalButton" type="button">Practice personal words</button>
@@ -119,6 +121,8 @@
           <p id="feedbackText"></p>
           <dl id="wordFacts" class="facts"></dl>
           <div class="action-stack compact">
+            <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
+            <p id="confidenceStatus" class="help-text hidden" role="status"></p>
             <button id="detailsButton" type="button">Show synonyms and antonyms</button>
             <button id="nextQuestionButton" class="primary" type="button">Next question</button>
           </div>
@@ -146,6 +150,14 @@
         <button id="lookupButton" class="primary" type="submit">Look up word</button>
       </form>
       <p id="lookupStatus" role="status" aria-live="polite"></p>
+
+      <section id="recentLookups" class="recent-lookups hidden" aria-labelledby="recentLookupsHeading">
+        <div class="row-between">
+          <h3 id="recentLookupsHeading">Recent lookups</h3>
+          <button id="clearRecentLookupsButton" class="secondary" type="button">Clear</button>
+        </div>
+        <div id="recentLookupButtons" class="chip-list"></div>
+      </section>
 
       <section id="lookupResult" class="lookup-result hidden" tabindex="-1" aria-labelledby="lookupResultHeading">
         <h3 id="lookupResultHeading"></h3>
@@ -182,6 +194,12 @@
           <option value="all">All words</option>
           <option value="personal">Personal words</option>
           <option value="starter">Starter words</option>
+        </select>
+        <label for="availabilityFilter">Availability</label>
+        <select id="availabilityFilter">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
         </select>
         <label for="statusFilter">Mastery status</label>
         <select id="statusFilter">
@@ -229,6 +247,20 @@
         <p id="keyStatus" role="status"></p>
       </div>
 
+      <h3>Appearance and interaction</h3>
+      <label for="appearanceMode">Appearance</label>
+      <select id="appearanceMode">
+        <option value="system">Follow system</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+      <label for="wordActivation">Tapping a synonym or antonym</label>
+      <select id="wordActivation">
+        <option value="options">Show word options</option>
+        <option value="add">Add immediately when possible</option>
+      </select>
+      <p class="help-text">Show word options is the safer default. It lets you look up, add, practice, mark known, or suspend a word without adding it accidentally.</p>
+
       <h3>Accessibility and navigation</h3>
       <label class="inline setting-toggle"><input id="focusedPractice" type="checkbox"> Focused Practice mode</label>
       <p class="help-text">When enabled, the app header, main navigation, and footer are hidden only while a practice session is active. This reduces extra swipe targets without changing the question or feedback controls.</p>
@@ -252,7 +284,7 @@
   </main>
 
   <footer>
-    <p>Vocabulary Tracker v0.4. Progress is stored locally on your device.</p>
+    <p>Vocabulary Tracker v0.5. Progress is stored locally on your device.</p>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
