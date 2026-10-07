@@ -189,3 +189,24 @@ body.focus-practice #quizArea { margin-top: .25rem; }
   .thesaurus-word-list button { width: 100%; text-align: left; }
 }
 :root[data-theme="light"] { color-scheme: light; }
+
+/* v0.6 accessible home, collections, history, and paged library */
+.home-section { margin: 1.25rem 0; padding-top: .25rem; }
+.home-section + .home-section { border-top: 1px solid var(--border); padding-top: 1rem; }
+.home-section h3 { margin-top: 0; }
+.accessible-stat-list { display: grid; gap: .6rem; }
+.accessible-stat-list button { width: 100%; text-align: left; min-height: 52px; }
+.collection-list { display: grid; gap: .9rem; }
+.collection-card { background: var(--surface); border: 1px solid var(--border); border-radius: .7rem; padding: .9rem; box-shadow: var(--shadow); }
+.collection-card h3 { margin-top: 0; margin-bottom: .35rem; }
+.collection-card p { margin: .35rem 0; }
+.collection-card .action-row button { flex: 1 1 14rem; text-align: left; }
+.pagination-controls { display: grid; grid-template-columns: 1fr auto 1fr; gap: .6rem; align-items: center; margin: 1rem 0; }
+.pagination-controls button { width: 100%; }
+#wordPageStatus { text-align: center; min-width: 7rem; }
+#historyMoreButton { width: 100%; margin-top: .8rem; }
+#wordListSummary:focus, #historySummary:focus { outline: 4px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 520px) {
+  .pagination-controls { grid-template-columns: 1fr; }
+  #wordPageStatus { order: -1; text-align: left; }
+}

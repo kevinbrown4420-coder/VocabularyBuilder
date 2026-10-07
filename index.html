@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#14324a">
-  <meta name="description" content="Accessible vocabulary practice with persistent progress tracking.">
+  <meta name="description" content="Accessible vocabulary practice with a 5,000-word curriculum, collections, history, and persistent progress tracking.">
   <title>Vocabulary Tracker</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
@@ -27,7 +27,9 @@
     <button type="button" data-view="home" aria-current="page">Home</button>
     <button type="button" data-view="practice">Practice</button>
     <button type="button" data-view="lookup">Word Lookup</button>
-    <button type="button" data-view="words">My Words</button>
+    <button type="button" data-view="words">Vocabulary Library</button>
+    <button type="button" data-view="collections">Collections</button>
+    <button type="button" data-view="history">Word History</button>
     <button type="button" data-view="stats">Statistics</button>
     <button type="button" data-view="settings">Settings</button>
   </nav>
@@ -37,34 +39,46 @@
       <h2 id="homeHeading">Home</h2>
       <div id="setupNotice" class="notice" role="status"></div>
       <p id="versionNotice" class="notice hidden" role="status"></p>
-      <div class="stat-grid" aria-label="Current progress">
-        <div class="stat-card"><span class="stat-number" id="homeMastered">0</span><span>Mastered</span></div>
-        <div class="stat-card"><span class="stat-number" id="homeLearning">0</span><span>Learning</span></div>
-        <div class="stat-card"><span class="stat-number" id="homeDue">0</span><span>Review due</span></div>
-        <div class="stat-card"><span class="stat-number" id="homeAccuracy">—</span><span>Accuracy</span></div>
-        <div class="stat-card"><span class="stat-number" id="homeStreak">0</span><span>Day streak</span></div>
-        <div class="stat-card"><span class="stat-number" id="homeSeen">0</span><span>Words encountered</span></div>
-        <div class="stat-card"><span class="stat-number" id="homePersonal">0</span><span>Personal words</span></div>
-      </div>
-      <p id="homePlacementStatus" class="notice">No placement check completed yet.</p>
-      <div class="action-stack">
-        <button id="resumeSessionButton" class="primary large hidden" type="button">Resume unfinished session</button>
-        <button id="startPracticeButton" class="primary large" type="button">Start practice</button>
+      <section class="home-section" aria-labelledby="homeStudyHeading">
+        <h3 id="homeStudyHeading">Continue studying</h3>
+        <div class="action-stack">
+          <button id="resumeSessionButton" class="primary large hidden" type="button">Resume unfinished session</button>
+          <button id="startPracticeButton" class="primary large" type="button">Start balanced practice</button>
+          <button id="reviewDueButton" type="button">Due reviews: 0</button>
+          <button id="reviewMissedButton" type="button">Difficult words: 0</button>
+          <button id="homePersonalButton" type="button">Practice personal words</button>
+        </div>
+      </section>
+
+      <section class="home-section" aria-labelledby="homeProgressHeading">
+        <h3 id="homeProgressHeading">Progress snapshot</h3>
+        <p class="help-text">Each item below is a separate control so TalkBack can identify the statistic and its number together.</p>
+        <div class="accessible-stat-list">
+          <button id="homeMasteredStat" type="button">Mastered: 0</button>
+          <button id="homeLearningStat" type="button">In progress: 0</button>
+          <button id="homeSeenStat" type="button">Words encountered: 0</button>
+          <button id="homePersonalStat" type="button">Personal words: 0</button>
+          <button id="homeAccuracyStat" type="button">Accuracy: —</button>
+          <button id="homeStreakStat" type="button">Study streak: 0 days</button>
+        </div>
+      </section>
+
+      <section class="home-section" aria-labelledby="homeExploreHeading">
+        <h3 id="homeExploreHeading">Explore vocabulary</h3>
+        <div class="action-stack">
+          <button id="homeLookupButton" type="button">Look up a word</button>
+          <button id="homeCollectionsButton" type="button">Browse topic collections</button>
+          <button id="homeHistoryButton" type="button">Open recent word history</button>
+          <button id="homeLibraryButton" type="button">Open vocabulary library</button>
+        </div>
+      </section>
+
+      <section class="home-section" aria-labelledby="homePlacementHeading">
+        <h3 id="homePlacementHeading">Placement and levels</h3>
+        <p id="homePlacementStatus" class="notice">No placement check completed yet.</p>
         <button id="homePlacementButton" type="button">Run 15-question placement check</button>
-        <button id="homePersonalButton" type="button">Practice personal words</button>
-        <button id="homeLookupButton" type="button">Look up a word</button>
-        <button id="reviewDueButton" type="button">Review words due now</button>
-        <button id="reviewMissedButton" type="button">Review difficult words</button>
-      </div>
-      <h3>Difficulty tiers</h3>
-      <p>The five tiers are assigned by this app for study organization. They are not Merriam-Webster difficulty ratings.</p>
-      <ol>
-        <li>Common</li>
-        <li>Intermediate</li>
-        <li>Advanced</li>
-        <li>Expert</li>
-        <li>Obscure</li>
-      </ol>
+        <p class="help-text">The five levels are app-defined study tiers, not Merriam-Webster difficulty ratings.</p>
+      </section>
     </section>
 
     <section id="view-practice" class="view hidden" aria-labelledby="practiceHeading">
@@ -86,7 +100,17 @@
         <select id="practiceSource">
           <option value="all" selected>All study words</option>
           <option value="personal">Personal words only</option>
-          <option value="starter">Starter bank only</option>
+          <option value="starter">Curriculum words only</option>
+        </select>
+        <label for="practiceCollection">Topic collection</label>
+        <select id="practiceCollection">
+          <option value="all" selected>All topics</option>
+        </select>
+        <label for="newWordMix">New-word mix</label>
+        <select id="newWordMix">
+          <option value="low">Low — mostly review</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="high">High — more unseen words</option>
         </select>
         <label for="sessionSize">Questions per session</label>
         <select id="sessionSize">
@@ -103,7 +127,7 @@
         </select>
         <button id="beginSessionButton" class="primary large" type="button">Begin session</button>
         <button id="placementButton" type="button">Run 15-question placement check</button>
-        <p class="help-text">Normal practice prioritizes newly added personal words when All study words is selected. If you miss a word, it may return later in the same session.</p>
+        <p class="help-text">Normal practice deliberately mixes review with unseen curriculum words. Recently practiced non-due words are temporarily deprioritized, while personal words and missed words retain priority.</p>
         <p class="help-text">The placement check uses three starter words from each difficulty level. It estimates a starting level and does not change mastery or study statistics.</p>
       </div>
 
@@ -185,7 +209,7 @@
     </section>
 
     <section id="view-words" class="view hidden" aria-labelledby="wordsHeading">
-      <h2 id="wordsHeading">My Words</h2>
+      <h2 id="wordsHeading">Vocabulary Library</h2>
       <div class="filters">
         <label for="wordSearch">Search words</label>
         <input id="wordSearch" type="search" autocomplete="off">
@@ -193,7 +217,11 @@
         <select id="sourceFilter">
           <option value="all">All words</option>
           <option value="personal">Personal words</option>
-          <option value="starter">Starter words</option>
+          <option value="starter">Curriculum words</option>
+        </select>
+        <label for="collectionFilter">Topic collection</label>
+        <select id="collectionFilter">
+          <option value="all">All collections</option>
         </select>
         <label for="availabilityFilter">Availability</label>
         <select id="availabilityFilter">
@@ -205,6 +233,7 @@
         <select id="statusFilter">
           <option value="all">All</option>
           <option value="New">New</option>
+          <option value="in-progress">In progress</option>
           <option value="Learning">Learning</option>
           <option value="Familiar">Familiar</option>
           <option value="Strong">Strong</option>
@@ -220,8 +249,27 @@
           <option value="5">Level 5</option>
         </select>
       </div>
-      <p id="wordListSummary" role="status"></p>
+      <p id="wordListSummary" role="status" tabindex="-1"></p>
       <ul id="wordList" class="word-list"></ul>
+      <div id="wordPagination" class="pagination-controls">
+        <button id="wordPrevButton" type="button">Previous 50</button>
+        <span id="wordPageStatus" role="status"></span>
+        <button id="wordNextButton" type="button">Next 50</button>
+      </div>
+    </section>
+
+    <section id="view-collections" class="view hidden" aria-labelledby="collectionsHeading">
+      <h2 id="collectionsHeading">Collections</h2>
+      <p>Practice or browse useful groups without remembering individual words. A word can belong to more than one collection.</p>
+      <div id="collectionList" class="collection-list"></div>
+    </section>
+
+    <section id="view-history" class="view hidden" aria-labelledby="historyHeading">
+      <h2 id="historyHeading">Word History</h2>
+      <p>Recently encountered words appear newest first so you can recover a word even when you cannot remember its spelling.</p>
+      <p id="historySummary" role="status" tabindex="-1"></p>
+      <ul id="historyList" class="word-list"></ul>
+      <button id="historyMoreButton" type="button">Show 50 more</button>
     </section>
 
     <section id="view-stats" class="view hidden" aria-labelledby="statsHeading">
@@ -284,10 +332,11 @@
   </main>
 
   <footer>
-    <p>Vocabulary Tracker v0.5. Progress is stored locally on your device.</p>
+    <p>Vocabulary Tracker v0.6. Progress is stored locally on your device.</p>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="curriculum.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

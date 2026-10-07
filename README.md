@@ -1,103 +1,90 @@
-# Vocabulary Tracker v0.4
+# Vocabulary Tracker v0.6
 
-An accessibility-first personal vocabulary trainer designed for screen-reader use. It uses Merriam-Webster API lookups for official definitions and optional thesaurus information, while storing only study progress persistently.
+Vocabulary Tracker is an accessibility-first personal vocabulary trainer designed for screen-reader use, especially TalkBack and JAWS. It combines a local study curriculum with live Merriam-Webster Dictionary and Thesaurus lookups while keeping API keys and learning progress on the user's device.
 
-## Core features
+## What is new in v0.6
 
-- 100 starter headwords across five app-defined difficulty tiers.
-- Four-choice practice: word → definition, definition → word, or mixed.
-- Merriam-Webster official `shortdef` content for quiz choices.
-- Optional synonyms and antonyms after each answer.
-- Persistent mastery states: New → Learning → Familiar → Strong → Mastered.
-- Due-review scheduling and same-session recycling of missed words, with explicit recycled-review counters and session summaries.
-- Optional Focused Practice mode that removes global navigation/header/footer from the active quiz to reduce TalkBack swipe targets.
-- Home dashboard, browseable word list, statistics, streaks, and progress backup/import.
-- Semantic HTML, large native buttons, visible focus, live status regions, and no information conveyed by color alone.
-- Installable PWA when hosted over HTTPS.
-- API keys are not embedded in the project. You enter them in Settings on your own device.
+- Expands the built-in curriculum from 100 placement words to **5,000 unique seed headwords** for everyday practice.
+- Keeps the original 100 words as the fixed 15-question placement-check pool so placement behavior remains comparable across versions.
+- Adds **12 overlapping topic collections**, led by **Practical academic & professional** with 1,087 deliberately tagged high-utility words.
+- Adds practical vocabulary for writing and punctuation, precise everyday distinctions, reasoning, college/research, work/projects, negotiation, accessibility/technology, government/contracting, business/analytics, housing/practical life, and literary/rhetorical language.
+- Rebuilds Home for touch exploration with separate TalkBack-friendly controls such as `Mastered: 12` and `Accuracy: 84%` rather than a visually grouped statistics grid.
+- Adds **Word History**, keeping the 500 most recently encountered unique words so a word can be recovered without remembering its spelling.
+- Replaces the potentially huge word list with a **paged Vocabulary Library** that displays at most 50 matches at a time and supports search, level, collection, source, mastery, and suspended/active filters.
+- Adds **Collections** browsing and one-button collection practice.
+- Adds Low / Balanced / High **new-word mix** controls. Balanced practice aims for about 50% unseen targets when possible; Low uses about 25% and High about 70%.
+- Temporarily deprioritizes the 30 most recently practiced non-due words while still prioritizing due reviews, difficult words, and personal vocabulary.
+- Remembers unusable curriculum headwords if Merriam-Webster has no usable exact entry and skips them in future sessions instead of repeatedly breaking practice.
+- Preserves all v0.5 features: dark mode, resumable sessions, recent lookups, expandable word actions, suspension, mark-known, personal-word difficulty, and lucky-guess correction.
 
-## Important API design choice
+## Curriculum design
 
-Merriam-Webster's public API does not reliably support browser CORS, so the app calls a same-origin `/api/lookup` proxy. The proxy forwards a user-requested lookup and returns the response. It is coded not to cache the response.
+`curriculum.js` contains headwords, app-defined difficulty levels, and collection tags only. It contains no Merriam-Webster definitions, synonym lists, or antonym lists.
 
-The browser stores your API keys locally. The keys are sent to your own app's proxy in a POST body for each lookup, and then to Merriam-Webster as required by their API. The project's progress-export feature deliberately excludes the keys.
+The 5,000-word catalog is built from reusable English frequency/lexicon resources in TextBlob and a hand-curated practical vocabulary layer. The generator removes many common corpus artifacts, proper-name-like entries, obvious inflections, misspellings, and overly basic concrete words. The 150-word Level 5 / Obscure tier is manually curated rather than inferred from historical corpus frequency.
 
-Merriam-Webster content is kept in memory for the current app session only. Definitions/thesaurus content are not placed in the app's persistent progress database.
+Current level distribution:
 
-## Quick local test on Windows
+- Level 1 — Common: 1,500
+- Level 2 — Intermediate: 1,450
+- Level 3 — Advanced: 1,150
+- Level 4 — Expert: 750
+- Level 5 — Obscure: 150
 
-You need Node.js 18 or newer.
+Difficulty is an app study aid, not a Merriam-Webster rating.
 
-1. Extract this folder.
-2. Open Terminal or Command Prompt in this folder.
-3. Run: `npm start`
-4. Open `http://localhost:3000` in a browser.
-5. Open Settings in Vocabulary Tracker, paste your two API keys, save them, and choose **Test both keys**.
+## Reference-content architecture
 
-No `npm install` is needed because v0.2 has no third-party package dependencies.
+Merriam-Webster remains the authoritative live reference source. The app requests a dictionary entry when a word is actually needed for a question or lookup. Thesaurus information is requested only when the user asks to see it.
 
-A phone on the same Wi-Fi can usually open the computer's LAN IP on port 3000 after Windows Firewall permits Node, but installation as a PWA requires HTTPS. For normal phone use, deploy it to an HTTPS host such as Vercel.
+This means adding thousands of seed words does **not** create a local copy of Merriam-Webster. The shipped catalog is small headword metadata; reference content stays on demand.
 
-## Vercel deployment
+The app's transient in-memory caches avoid repeated lookups during the same app session, but Merriam-Webster definitions/thesaurus content are not placed into the persistent progress database.
 
-The project includes a Vercel-compatible serverless function at `api/lookup.js`. Deploy the folder as a project. No API key environment variables are required because the user enters keys locally in the app Settings screen.
+## Persistent local data
 
-After deployment:
+v0.6 intentionally keeps the established storage keys so an update on the same production origin carries forward existing data:
 
-1. Open the HTTPS site on Android Chrome.
-2. Go to Settings and enter the two keys.
-3. Choose **Test both keys**.
-4. Use the browser's **Install app** / **Add to Home screen** command if the in-app Install button is not shown.
+- `vocabTrackerKeysV01` — local Merriam-Webster keys
+- `vocabTrackerProgressV01` — mastery, custom words, history, placement, statistics, suspended words, etc.
+- `vocabTrackerSettingsV01` — practice and accessibility settings
+- `vocabTrackerActiveSessionV01` — sanitized resumable-session metadata
 
-## Reference sources
+The 5,000 static curriculum words live in `curriculum.js`; they do not create 5,000 progress records in local storage. A word's persistent state is created only when needed.
 
-The app is intended for use with:
+Progress exports contain study progress/settings but do not include API keys.
 
-- Merriam-Webster's Collegiate® Dictionary with Audio
-- Merriam-Webster's Collegiate® Thesaurus
+## Accessibility design
 
-Merriam-Webster's branding guidelines require applications using its API to feature the Merriam-Webster logo. The Settings/About section loads the official logo directly from the branding-guidelines asset URL and names the two references used.
+- Native semantic buttons, inputs, selects, headings, regions, and labels.
+- Vertical Menu navigation instead of horizontally scrolling tabs.
+- Separate Home statistic controls so each label and value is one TalkBack target.
+- At most 50 library words rendered at once.
+- Word History is newest-first and capped at 500 unique words.
+- Expandable word actions avoid permanent rows of repetitive buttons.
+- Optional Focused Practice hides global navigation/header/footer only during an active quiz.
+- Visible keyboard focus, large controls, reduced-motion support, and no information conveyed by color alone.
 
-This is a personal noncommercial study project and is not endorsed by Merriam-Webster Inc.
+## Core files
 
-## Files
+- `index.html` — semantic user interface
+- `styles.css` — responsive accessible styling and light/dark themes
+- `app.js` — practice, progress, lookup, history, collections, navigation, and persistence
+- `curriculum.js` — 5,000 seed headwords, levels, and collection tags
+- `api/lookup.js` — same-origin Vercel proxy for user-requested Merriam-Webster lookups
+- `manifest.webmanifest` / `sw.js` — installable PWA shell and update cache
+- `THIRD-PARTY-NOTICES.txt` — curriculum-source attribution and notices
 
-- `index.html` — semantic UI
-- `styles.css` — responsive/high-contrast styling
-- `app.js` — game, progress, review scheduling, accessibility behavior
-- `api/lookup.js` — Vercel same-origin Merriam-Webster proxy
-- `dev-server.js` — dependency-free local development server and proxy
-- `manifest.webmanifest` / `sw.js` — PWA installation and static offline shell
-- `icon-192.png` / `icon-512.png` — app icons
+## Deployment
+
+The production project is intended to remain on the same Vercel origin so local browser storage continues to work across releases. `curriculum.js` must be deployed alongside the existing static files and is included in the v0.6 service-worker cache.
+
+No Vercel environment variable is required for the Merriam-Webster keys because the user enters those keys locally in Settings.
 
 ## Known limitations
 
-- The starter vocabulary list is curated by the app, not supplied or difficulty-rated by Merriam-Webster.
-- Pronunciation audio and usage examples are not yet surfaced.
-- It does not persist Merriam-Webster definitions between browser sessions.
-- The first time a new four-choice question appears, up to four dictionary lookups may be needed.
-- Thesaurus lookup occurs only when you request it after answering.
-- A later version should add a larger vetted word bank, user-selected review rules, pronunciation, and more question types.
-
-
-## v0.3 changes
-
-- Replaces the horizontally scrolling navigation tabs with a single Menu button and a vertical TalkBack-friendly menu.
-- Adds universal Merriam-Webster Word Lookup for arbitrary words recognized by the Dictionary API.
-- Displays up to three official short definitions plus thesaurus synonyms/antonyms when available.
-- Lets a recognized dictionary headword be added to My Words at a chosen study difficulty.
-- Personal words participate in practice, progress, review scheduling, statistics, export, and import.
-- Shows Merriam-Webster spelling suggestions when no exact dictionary entry is returned.
-- Uses a network-first PWA cache strategy and a v0.3 cache name to reduce stale-version problems.
-
-
-## v0.4 changes
-
-- Adds a 15-question placement check with three starter words from each difficulty level. The diagnostic does not change mastery, answer totals, session counts, or streaks.
-- Saves a recommended starting level and provides a one-button way to apply it to practice settings.
-- Adds All study words / Personal words only / Starter bank only practice sources.
-- Prioritizes new personal words during ordinary mixed-source practice so user-added vocabulary surfaces sooner.
-- Adds a Personal words quick entry point from Home and a Word source filter in My Words.
-- Makes individual thesaurus synonyms and antonyms directly addable to My Words from both Word Lookup and post-answer details.
-- Adds personal-word and placement information to Statistics.
-- Uses a v0.4 service-worker cache while preserving the existing local-storage keys for API keys, progress, settings, and personal vocabulary.
+- The 5,000-word curriculum is a study-oriented filtered catalog, not a claim that every word's assigned level is objectively correct.
+- A small number of seed headwords may not produce a usable Merriam-Webster Collegiate entry. The app skips and remembers those locally when encountered.
+- Topic tags overlap by design and are not an exhaustive ontology.
+- Definitions and thesaurus data require network access unless already available transiently in the current app session.
+- Pronunciation audio and example sentences are not yet surfaced.
