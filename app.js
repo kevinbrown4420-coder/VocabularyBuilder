@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.0';
+  const APP_VERSION = '1.1';
   const LEVEL_NAMES = {1:'Common',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -595,7 +595,7 @@
     const streak=progress.streak?.current || 0;
 
     $('homeProgressSummary').textContent = seen.length
-      ? `${seen.length.toLocaleString()} words studied. ${mastered.toLocaleString()} mastered. Accuracy ${accuracy(progress.totals.correct,progress.totals.answers)}. ${streak}-day streak.`
+      ? `${seen.length.toLocaleString()} studied · ${mastered.toLocaleString()} mastered · ${accuracy(progress.totals.correct,progress.totals.answers)} accuracy · ${streak}-day streak`
       : 'No study activity yet. Choose a level to begin.';
     $('homeSavedWordsButton').textContent=`Review saved words (${savedCount.toLocaleString()})`;
     $('reviewDueButton').textContent=`Review due words (${due})`;
@@ -903,7 +903,7 @@
     return value.length <= ANSWER_MAX_CHARS && definitionWordCount(value) <= ANSWER_MAX_WORDS;
   }
 
-  function chooseStudyDefinition(shortdefs, word) {
+  function orderedUsefulDefinitions(shortdefs, word) {
     const normalizedWord = normalizeWordForMatch(word);
     const defs = [...new Set((shortdefs || []).map(value => String(value || '').trim()).filter(Boolean))];
     const useful = defs.filter(definition => {
@@ -911,17 +911,20 @@
       const normalizedDefinition = normalizeWordForMatch(definition);
       return tokens.length >= 2 && normalizedDefinition !== normalizedWord;
     });
-    const ordered=(useful.length ? useful : defs).sort((a,b)=>a.length-b.length);
-    return ordered[0] || '';
+    return useful.length ? useful : defs;
+  }
+
+  function chooseStudyDefinition(shortdefs, word) {
+    // Merriam-Webster shortdef is already ordered by dictionary sense.
+    // Preserve that ordering so a shorter specialist sense never displaces the primary sense.
+    return orderedUsefulDefinitions(shortdefs, word)[0] || '';
   }
 
   function chooseAnswerDefinition(shortdefs, word) {
-    const normalizedWord = normalizeWordForMatch(word);
-    const defs=[...new Set((shortdefs || []).map(value => String(value || '').trim()).filter(Boolean))]
-      .filter(definition => definitionTokens(definition).length >= 2 && normalizeWordForMatch(definition)!==normalizedWord)
-      .filter(isConciseAnswerDefinition)
-      .sort((a,b)=>a.length-b.length);
-    return defs[0] || '';
+    // Only use the primary usable sense for word-to-meaning questions.
+    // If it is too long, makeQuestion flips to definition-to-word rather than choosing a later sense.
+    const primary = orderedUsefulDefinitions(shortdefs, word)[0] || '';
+    return isConciseAnswerDefinition(primary) ? primary : '';
   }
 
   function parseDictionaryData(word, data) {
@@ -1099,8 +1102,10 @@
     const state=getExistingWordState(word);
     const saved=isSavedWord(word);
 
-    $('wordDetailWord').textContent=dictionary?.headword || word;
-    $('wordDetailStatus').textContent=state.suspended ? 'Review paused' : (saved ? `Saved. ${statusOf(state)}.` : statusOf(state));
+    const detailHeadword=dictionary?.headword || word;
+    $('wordDetailWord').textContent=detailHeadword;
+    $('wordDetailWord').setAttribute('aria-label',dictionary?.partOfSpeech ? `${detailHeadword}, ${dictionary.partOfSpeech}` : detailHeadword);
+    $('wordDetailStatus').textContent=state.suspended ? 'Review paused' : (saved ? `Saved · ${statusOf(state)}` : statusOf(state));
     $('wordDetailPartOfSpeech').textContent=dictionary?.partOfSpeech || '';
     $('wordDetailPartOfSpeech').classList.toggle('hidden', !dictionary?.partOfSpeech);
     $('wordDetailMeaning').textContent=dictionary?.definition || dictionary?.shortdefs?.[0] || 'Definition unavailable.';
@@ -1119,6 +1124,8 @@
     const save=$('wordSaveButton');
     save.classList.toggle('hidden', saved);
     save.textContent='Save word';
+    const unsave=$('wordUnsaveButton');
+    if (unsave) unsave.classList.toggle('hidden', !saved);
     const practice=$('wordPracticeButton');
     practice.classList.remove('hidden');
     practice.textContent='Practice word';
@@ -1177,6 +1184,23 @@
     if (addCustomStudyWord(currentWordDetail.word,level)) showToast(`${currentWordDetail.word} saved.`);
     currentWordDetail.item=studyWordItem(currentWordDetail.word) || currentWordDetail.item;
     renderWordDetail(); renderHome();
+  }
+
+  function removeCurrentWordFromSaved() {
+    if (!currentWordDetail) return;
+    const word=currentWordDetail.word;
+    const item=studyWordItem(word);
+    const state=wordState(word);
+    if (item?.custom) {
+      progress.customWords=(Array.isArray(progress.customWords) ? progress.customWords : [])
+        .filter(entry=>String(entry?.word||'').toLowerCase()!==word);
+      currentWordDetail.item={word,level:item.level || 3,collections:[],custom:false};
+    }
+    state.saved=false;
+    saveState();
+    renderWordDetail();
+    renderHome();
+    showToast(`${word} removed from saved words.`);
   }
 
   async function showCurrentWordRelated() {
@@ -1373,7 +1397,9 @@
     const levelDifference=Math.abs((targetItem.level||3)-(candidateItem.level||3));
     if (levelDifference===0) score += 3;
     else if (levelDifference===1) score += 2;
-    if (sharedCollectionCount(targetItem,candidateItem)===0) score += 2;
+    const sharedCollections=sharedCollectionCount(targetItem,candidateItem);
+    if (sharedCollections===1) score += 2;
+    else if (sharedCollections>=2) score += 1;
     score += Math.max(0, 2 - similarity*4);
     return score;
   }
@@ -1503,9 +1529,10 @@
     $('feedbackSaveButton').classList.add('hidden');
     $('feedbackOpenWordButton').classList.add('hidden');
     const prompt = q.direction==='word-def' ? q.item.word : q.target.definition;
-    $('questionType').textContent = q.direction==='word-def' ? 'Choose the official definition' : 'Choose the word';
-    $('questionContext').textContent = q.target.partOfSpeech ? `Part of speech: ${q.target.partOfSpeech}` : '';
+    $('questionType').textContent = q.direction==='word-def' ? 'Choose the meaning' : 'Choose the word';
+    $('questionContext').textContent = q.target.partOfSpeech || '';
     $('questionPrompt').textContent = prompt;
+    $('questionPrompt').setAttribute('aria-label', q.target.partOfSpeech ? `${prompt}, ${q.target.partOfSpeech}` : prompt);
     const choices = $('answerChoices');
     choices.innerHTML = '';
     q.options.forEach(option => {
@@ -1539,7 +1566,7 @@
       list.appendChild(li);
     }
     section.classList.toggle('hidden',definitions.length===0);
-    setDetailsOpen(section,false);
+    if ('open' in section) setDetailsOpen(section,false);
   }
 
   function answerQuestion(option, button) {
@@ -1580,11 +1607,11 @@
     const primaryDefinition=q.target.answerDefinition || q.target.definition;
     panel.className=`feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
     $('feedbackHeading').textContent=isCorrect ? 'Correct' : 'Not quite';
+    const wordAndPart=q.target.partOfSpeech ? `${q.item.word}, ${q.target.partOfSpeech}` : q.item.word;
     $('feedbackText').textContent=isCorrect
-      ? `${q.item.word}: ${primaryDefinition}`
-      : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}. ${isPlacement ? '' : 'This word will return later.'}`.trim();
+      ? `${wordAndPart}. ${primaryDefinition}`
+      : `${wordAndPart}. ${primaryDefinition}${isPlacement ? '' : ' This word will return later.'}`;
     $('wordFacts').innerHTML='';
-    if (q.target.partOfSpeech) addFact('Part of speech',q.target.partOfSpeech);
     addFact('Source','Merriam-Webster Collegiate Dictionary');
     renderOfficialDefinitions(q.target);
     if (isPlacement) {
@@ -1957,35 +1984,43 @@
     $('showKeys').checked = false;
     $('appearanceMode').value = settings.appearance || 'system';
     $('dictionaryKey').type='password'; $('thesaurusKey').type='password';
-    const connected=Boolean(keys.dictionary && keys.thesaurus);
-    $('keyStatus').textContent = connected ? 'Dictionary and thesaurus keys are saved on this device.' : 'Setup is incomplete. Add both API keys.';
-    setDetailsOpen($('referenceSettings'),!connected);
+    const dictionaryReady=Boolean(keys.dictionary);
+    const thesaurusReady=Boolean(keys.thesaurus);
+    $('keyStatus').textContent = dictionaryReady
+      ? (thesaurusReady ? 'Dictionary and thesaurus are ready.' : 'Dictionary is ready. Add a thesaurus key only for synonyms and antonyms.')
+      : 'Add a dictionary API key before practice.';
+    setDetailsOpen($('referenceSettings'),!dictionaryReady);
   }
 
   function saveKeysFromForm() {
     keys = {dictionary:$('dictionaryKey').value.trim(), thesaurus:$('thesaurusKey').value.trim()};
     saveKeys();
     transientDictionary.clear(); transientThesaurus.clear();
-    $('keyStatus').textContent = keys.dictionary && keys.thesaurus ? 'Keys saved on this device.' : 'Please enter both keys.';
+    $('keyStatus').textContent = keys.dictionary
+      ? (keys.thesaurus ? 'Dictionary and thesaurus are ready.' : 'Dictionary is ready. Thesaurus is optional.')
+      : 'Add a dictionary API key before practice.';
     renderHome();
   }
 
   async function testKeys() {
     saveKeysFromForm();
-    if (!keys.dictionary || !keys.thesaurus) return;
+    if (!keys.dictionary) return;
     const button=$('testKeysButton');button.classList.add('hidden');
-    $('keyStatus').textContent='Testing both keys…';
+    $('keyStatus').textContent=keys.thesaurus ? 'Checking dictionary and thesaurus…' : 'Checking dictionary…';
     try {
-      const [d,t]=await Promise.all([
-        apiLookup('dictionary','voluminous',keys.dictionary),
-        apiLookup('thesaurus','umpire',keys.thesaurus)
-      ]);
+      const d=await apiLookup('dictionary','voluminous',keys.dictionary);
       const dictOK=Array.isArray(d)&&d.some(x=>x&&typeof x==='object'&&x.shortdef?.length);
-      const thesOK=Array.isArray(t)&&t.some(x=>x&&typeof x==='object');
-      if(!dictOK||!thesOK) throw new Error('One key returned an unexpected result.');
-      $('keyStatus').textContent='Success. Both Merriam-Webster keys returned usable results.';
+      if(!dictOK) throw new Error('The dictionary key returned an unexpected result.');
+      if (keys.thesaurus) {
+        const t=await apiLookup('thesaurus','umpire',keys.thesaurus);
+        const thesOK=Array.isArray(t)&&t.some(x=>x&&typeof x==='object');
+        if(!thesOK) throw new Error('The thesaurus key returned an unexpected result.');
+        $('keyStatus').textContent='Success. Dictionary and thesaurus are working.';
+      } else {
+        $('keyStatus').textContent='Success. Dictionary is working. Thesaurus is optional.';
+      }
     } catch(e) {
-      $('keyStatus').textContent=`Test failed: ${e.message}`;
+      $('keyStatus').textContent=`Connection check failed: ${e.message}`;
     } finally { button.classList.remove('hidden'); }
   }
 
@@ -2070,6 +2105,7 @@
     $('feedbackSaveButton').addEventListener('click',saveFeedbackWord);
     $('feedbackOpenWordButton').addEventListener('click',openFeedbackWord);
     $('wordSaveButton').addEventListener('click',saveCurrentWord);
+    $('wordUnsaveButton').addEventListener('click',removeCurrentWordFromSaved);
     $('wordPracticeButton').addEventListener('click',()=>{ if(currentWordDetail) practiceWordNow(currentWordDetail.word,currentWordDetail.item?.level||3); });
     $('wordRelatedButton').addEventListener('click',showCurrentWordRelated);
     $('wordKnownButton').addEventListener('click',markCurrentWordKnown);

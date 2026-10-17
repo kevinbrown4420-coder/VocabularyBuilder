@@ -140,8 +140,8 @@
         <div id="loadingQuestion" class="notice hidden" role="status">Loading official dictionary entries…</div>
         <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
           <p id="questionType" class="eyebrow"></p>
-          <p id="questionContext" class="question-context"></p>
           <h3 id="questionPrompt" tabindex="-1"></h3>
+          <p id="questionContext" class="question-context" aria-hidden="true"></p>
           <div id="answerChoices" class="answers" role="group" aria-label="Answer choices"></div>
         </article>
 
@@ -149,8 +149,8 @@
           <h3 id="feedbackHeading" tabindex="-1"></h3>
           <p id="feedbackText"></p>
           <div class="feedback-actions">
-            <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
             <button id="nextQuestionButton" class="primary" type="button">Next word</button>
+            <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
             <button id="feedbackSaveButton" type="button">Save word</button>
             <button id="feedbackOpenWordButton" type="button">Word details</button>
           </div>
@@ -158,10 +158,10 @@
           <details id="feedbackMore" class="feedback-more">
             <summary>More about this word</summary>
             <dl id="wordFacts" class="facts"></dl>
-            <details id="officialDefinitions" class="official-definitions hidden">
-              <summary id="officialDefinitionsHeading">More Merriam-Webster definitions</summary>
+            <section id="officialDefinitions" class="official-definitions hidden" aria-labelledby="officialDefinitionsHeading">
+              <h4 id="officialDefinitionsHeading">Other definitions</h4>
               <ol id="officialDefinitionList"></ol>
-            </details>
+            </section>
             <button id="detailsButton" type="button">Related words</button>
             <div id="detailsPanel" class="details hidden" aria-live="polite"></div>
           </details>
@@ -212,7 +212,7 @@
         <div id="wordDetailContent" class="hidden">
           <p id="wordDetailStatus" class="status-pill"></p>
           <h2 id="wordDetailWord" tabindex="-1"></h2>
-          <p id="wordDetailPartOfSpeech" class="word-part"></p>
+          <p id="wordDetailPartOfSpeech" class="word-part" aria-hidden="true"></p>
           <p id="wordDetailMeaning" class="word-meaning"></p>
           <p id="wordDetailRecord" class="word-record"></p>
 
@@ -239,6 +239,7 @@
             <div class="word-secondary-actions">
               <button id="wordKnownButton" type="button">Mark as known</button>
               <button id="wordSuspendButton" type="button">Pause review</button>
+              <button id="wordUnsaveButton" class="hidden" type="button">Remove from saved words</button>
             </div>
             <div id="wordLevelControl" class="hidden">
               <label for="wordLevelSelect">Study level</label>
@@ -346,7 +347,7 @@
 
       <details id="referenceSettings" class="settings-disclosure">
         <summary>Dictionary connection</summary>
-        <p class="help-text">Your Merriam-Webster API keys stay in this browser's local storage and are sent only through the app's same-origin lookup proxy.</p>
+        <p class="help-text">The dictionary key is required for practice. The thesaurus key is optional and adds synonyms and antonyms. Keys stay on this device.</p>
         <div class="settings-form">
           <label for="dictionaryKey">Dictionary API key</label>
           <input id="dictionaryKey" type="password" autocomplete="off" spellcheck="false">
@@ -378,7 +379,7 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.0</strong></p>
+        <p><strong>Version 1.1</strong></p>
         <p>Accessibility-first vocabulary practice with a 5,000-word curriculum and live Merriam-Webster reference data.</p>
       </section>
       <section class="builder-panel">
