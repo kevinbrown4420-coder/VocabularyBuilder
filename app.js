@@ -21,8 +21,8 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.2';
-  const LEVEL_NAMES = {1:'Common',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
+  const APP_VERSION = '1.3';
+  const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
   const KEY_STORAGE = 'vocabTrackerKeysV01';
@@ -83,6 +83,15 @@
         known.add(word);
       }
     }
+    // Preserve words the user saved in earlier curriculum versions even if the
+    // curated v1.3 bank no longer includes them.
+    for (const [word,state] of Object.entries(progress.words || {})) {
+      const normalized=String(word || '').trim().toLowerCase();
+      if (normalized && state?.saved && !known.has(normalized)) {
+        base.push({word:normalized, level:3, collections:[], custom:true, legacySaved:true});
+        known.add(normalized);
+      }
+    }
     return base;
   }
 
@@ -129,7 +138,9 @@
     const curriculum = CURRICULUM_MAP.get(normalized);
     if (curriculum) return curriculum;
     const custom = Array.isArray(progress.customWords) ? progress.customWords.find(item => String(item.word||'').toLowerCase()===normalized) : null;
-    return custom ? {word:normalized, level:Math.max(1,Math.min(5,Number(custom.level)||3)), collections:[], custom:true, addedAt:custom.addedAt||null} : null;
+    if (custom) return {word:normalized, level:Math.max(1,Math.min(5,Number(custom.level)||3)), collections:[], custom:true, addedAt:custom.addedAt||null};
+    if (progress.words?.[normalized]?.saved) return {word:normalized, level:3, collections:[], custom:true, legacySaved:true};
+    return null;
   }
 
   function collectionName(id) {
@@ -650,7 +661,7 @@
   function buildSession(mode='normal') {
     if (mode === 'placement') {
       const selected = [];
-      for (let level=1; level<=5; level++) selected.push(...shuffle(WORDS.filter(item => item.level===level)).slice(0,3));
+      for (let level=1; level<=5; level++) selected.push(...shuffle(CURRICULUM.filter(item => item.level===level)).slice(0,3));
       return {
         mode:'placement', queue:shuffle(selected).map(w => ({...w, custom:false, repeat:false})), index:0, answered:0, correct:0,
         current:null, completed:false, direction:'def-word', levels:[1,2,3,4,5], source:'starter', collection:'all', novelty:'balanced',
@@ -992,28 +1003,108 @@
     return isConciseAnswerDefinition(primaryUseful) ? primaryUseful : '';
   }
 
+  function cleanMwText(text) {
+    let value=String(text || '');
+    if (!value) return '';
+    value=value
+      .replace(/\{bc\}/g, ': ')
+      .replace(/\{ldquo\}/g, '“').replace(/\{rdquo\}/g, '”')
+      .replace(/\{lsquo\}/g, '‘').replace(/\{rsquo\}/g, '’')
+      .replace(/\{(?:sx|dxt|a_link|d_link|i_link)\|([^|{}]+)(?:\|[^{}]*)?\}/g, '$1')
+      .replace(/\{(?:it|wi|qword|phrase|sc|sup|inf|b|rom|dx|dx_def)\}/g, '')
+      .replace(/\{\/(?:it|wi|qword|phrase|sc|sup|inf|b|rom|dx|dx_def)\}/g, '')
+      .replace(/\{[^{}]*\}/g, '')
+      .replace(/\s+([,.;:!?])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^[\s:;,-]+/, '')
+      .trim();
+    return value;
+  }
+
+  function collectMwDefinitionText(node, out=[]) {
+    if (Array.isArray(node)) {
+      if (node.length===2 && node[0]==='text' && typeof node[1]==='string') {
+        const cleaned=cleanMwText(node[1]);
+        if (cleaned) out.push(cleaned);
+        return out;
+      }
+      for (const child of node) collectMwDefinitionText(child,out);
+      return out;
+    }
+    if (node && typeof node==='object') {
+      for (const value of Object.values(node)) collectMwDefinitionText(value,out);
+    }
+    return out;
+  }
+
+  function learnerDefinitionsFromEntry(entry, word) {
+    const learner=entry?.suppl?.ldq?.def;
+    if (!learner) return [];
+    const values=collectMwDefinitionText(learner,[]);
+    return [...new Set(values)]
+      .filter(definition=>isPedagogicallyUsefulDefinition(definition,word))
+      .slice(0,4);
+  }
+
+  function supplementalExampleFromEntry(entry) {
+    const examples=Array.isArray(entry?.suppl?.examples) ? entry.suppl.examples : [];
+    for (const example of examples) {
+      const cleaned=cleanMwText(example?.t);
+      if (cleaned) return cleaned;
+    }
+    return '';
+  }
+
+  const TECHNICAL_ENTRY_LABELS = /\b(?:anatomy|anatomical|medicine|medical|pathology|pathological|botany|botanical|zoology|zoological|chemistry|chemical|biochemistry|geology|geological|microbiology)\b/i;
+
+  function entryPedagogyScore(entry, word) {
+    const shortdefs=Array.isArray(entry?.shortdef) ? entry.shortdef.map(value=>String(value||'').trim()).filter(Boolean) : [];
+    const learner=learnerDefinitionsFromEntry(entry,word);
+    const usefulShort=orderedUsefulDefinitions(shortdefs,word);
+    let score=0;
+    if (learner.length) score+=50;
+    score+=Math.min(12,usefulShort.length*4);
+    if (learner[0] && isConciseAnswerDefinition(learner[0])) score+=6;
+    else if (usefulShort[0] && isConciseAnswerDefinition(usefulShort[0])) score+=3;
+    const labels=[
+      ...(Array.isArray(entry?.sls) ? entry.sls : []),
+      ...(Array.isArray(entry?.lbs) ? entry.lbs : [])
+    ].join(' ');
+    if (TECHNICAL_ENTRY_LABELS.test(labels)) score-=35;
+    const source=String(entry?.meta?.src || '');
+    if (/medical/i.test(source)) score-=50;
+    return score;
+  }
+
   function parseDictionaryData(word, data) {
     if (!Array.isArray(data)) throw new Error('Unexpected dictionary response.');
     if (data.length && typeof data[0] === 'string') throw new Error(`No exact dictionary entry for ${word}.`);
-    const entries = data.filter(item => item && typeof item==='object' && Array.isArray(item.shortdef) && item.shortdef.length);
+    const entries = data.filter(item => item && typeof item==='object' && (Array.isArray(item.shortdef) || item?.suppl?.ldq?.def));
     if (!entries.length) throw new Error(`No usable definition for ${word}.`);
     const query = normalizeWordForMatch(word);
     const exact = entries.filter(entry => normalizeWordForMatch(entry.hwi?.hw) === query);
     const stemMatches = entries.filter(entry => Array.isArray(entry.meta?.stems) && entry.meta.stems.some(stem => normalizeWordForMatch(stem) === query));
-    const entry = exact[0] || stemMatches[0] || entries[0];
-    const shortdefs = [...new Set(entry.shortdef.map(value => String(value || '').trim()).filter(Boolean))].slice(0,3);
-    const definition = chooseStudyDefinition(shortdefs, word);
-    const quizDefinition = chooseQuizDefinition(shortdefs, word);
-    const answerDefinition = chooseAnswerDefinition(shortdefs, word);
-    if (!definition) throw new Error(`No usable definition for ${word}.`);
+    const pool = exact.length ? exact : (stemMatches.length ? stemMatches : entries);
+    const entry = [...pool].sort((a,b)=>entryPedagogyScore(b,word)-entryPedagogyScore(a,word))[0];
+    const shortdefs = [...new Set((entry.shortdef || []).map(value => String(value || '').trim()).filter(Boolean))].slice(0,3);
+    const learnerDefinitions=learnerDefinitionsFromEntry(entry,word);
+    const studyDefinitions=[...new Set([...learnerDefinitions,...shortdefs])];
+    const definition = chooseStudyDefinition(studyDefinitions, word);
+    const quizDefinition = chooseQuizDefinition(studyDefinitions, word);
+    const answerDefinition = chooseAnswerDefinition(studyDefinitions, word);
+    if (!definition || !quizDefinition) throw new Error(`No useful quiz definition for ${word}.`);
     return {
       word:String(word || '').toLowerCase(),
       headword: normalizeHeadword(entry.hwi?.hw) || word,
-      partOfSpeech: entry.fl || '',
+      partOfSpeech: entry.suppl?.ldq?.fl || entry.fl || '',
       shortdefs,
+      learnerDefinitions,
+      studyDefinitions,
       definition,
       quizDefinition,
       answerDefinition,
+      example:supplementalExampleFromEntry(entry),
+      definitionStyle:learnerDefinitions.length ? 'learner' : 'collegiate',
       source: 'Merriam-Webster Collegiate Dictionary'
     };
   }
@@ -1176,13 +1267,18 @@
     $('wordDetailPartOfSpeech').textContent=dictionary?.partOfSpeech || '';
     $('wordDetailPartOfSpeech').classList.toggle('hidden', !dictionary?.partOfSpeech);
     $('wordDetailMeaning').textContent=dictionary?.definition || dictionary?.shortdefs?.[0] || 'Definition unavailable.';
+    const example=$('wordDetailExample');
+    if (example) {
+      example.textContent=dictionary?.example ? `Example: ${dictionary.example}` : '';
+      example.classList.toggle('hidden', !dictionary?.example);
+    }
     $('wordDetailRecord').textContent=state.seen
       ? `${state.correct} correct, ${state.wrong} missed. Accuracy ${accuracy(state.correct,state.correct+state.wrong)}.`
       : (state.markedKnown ? 'Marked as known.' : 'Not studied yet.');
 
-    const definitions=Array.isArray(dictionary?.shortdefs)
-      ? dictionary.shortdefs.filter(definition=>definition && isPedagogicallyUsefulDefinition(definition,word))
-      : [];
+    const definitions=Array.isArray(dictionary?.studyDefinitions)
+      ? dictionary.studyDefinitions.filter(definition=>definition && isPedagogicallyUsefulDefinition(definition,word))
+      : (Array.isArray(dictionary?.shortdefs) ? dictionary.shortdefs.filter(definition=>definition && isPedagogicallyUsefulDefinition(definition,word)) : []);
     const mainDefinition=String(dictionary?.definition || '').trim();
     const more=definitions.filter(definition=>String(definition).trim()!==mainDefinition).slice(0,3);
     const details=$('wordDefinitionsDetails'); const list=$('wordDefinitionList');
@@ -1495,7 +1591,7 @@
 
   async function makeQuestion(item) {
     const questionPool = session?.mode === 'placement'
-      ? WORDS.map(word => ({...word, custom:false, collections:[]}))
+      ? CURRICULUM
       : allStudyWords().filter(word => (!getExistingWordState(word.word).suspended && !isInvalidSeed(word.word)) || word.word===item.word);
 
     const recentOptionWords=new Set((session?.recentOptionWords || []).map(word=>String(word).toLowerCase()));
@@ -1668,7 +1764,8 @@
     const list=$('officialDefinitionList');
     list.innerHTML='';
     const primary=String(target.answerDefinition || target.definition || '').trim();
-    const definitions=[...new Set((target.shortdefs||[]).map(value=>String(value||'').trim()).filter(Boolean))]
+    const sourceDefinitions=Array.isArray(target.studyDefinitions) ? target.studyDefinitions : (target.shortdefs || []);
+    const definitions=[...new Set(sourceDefinitions.map(value=>String(value||'').trim()).filter(Boolean))]
       .filter(definition=>definition!==primary && isPedagogicallyUsefulDefinition(definition,target.word))
       .slice(0,2);
     for (const definition of definitions) {
@@ -1723,6 +1820,7 @@
       ? `${wordAndPart}. ${primaryDefinition}`
       : `${wordAndPart}. ${primaryDefinition}${isPlacement ? '' : ' This word will return later.'}`;
     $('wordFacts').innerHTML='';
+    if (q.target.example) addFact('Example',q.target.example);
     addFact('Source','Merriam-Webster Collegiate Dictionary');
     renderOfficialDefinitions(q.target);
     if (isPlacement) {

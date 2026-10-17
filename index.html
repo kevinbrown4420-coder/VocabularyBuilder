@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#4b1f69">
-  <meta name="description" content="Accessible level-based vocabulary practice with a 5,000-word curriculum, TalkBack-first navigation, and live Merriam-Webster reference data.">
+  <meta name="description" content="Accessible vocabulary practice with a curated high-value study bank, TalkBack-first navigation, and live Merriam-Webster reference data.">
   <title>Vocabulary Builder</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
@@ -49,7 +49,7 @@
         <p class="home-hero-intro">Tap a level and practice starts immediately.</p>
         <button id="resumeSessionButton" class="resume-strip hidden" type="button">Resume unfinished round</button>
         <div class="level-stack level-stack-primary">
-          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Common</span><span id="homeLevel1Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Core</span><span id="homeLevel1Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
           <button class="level-row" type="button" data-home-level="2"><span class="level-title">Level 2 · Intermediate</span><span id="homeLevel2Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel2Bar" class="level-fill"></span></span></button>
           <button class="level-row" type="button" data-home-level="3"><span class="level-title">Level 3 · Advanced</span><span id="homeLevel3Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel3Bar" class="level-fill"></span></span></button>
           <button class="level-row" type="button" data-home-level="4"><span class="level-title">Level 4 · Expert</span><span id="homeLevel4Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel4Bar" class="level-fill"></span></span></button>
@@ -92,7 +92,7 @@
       <div id="practiceSetup">
         <fieldset>
           <legend>Difficulty levels</legend>
-          <label><input type="checkbox" name="level" value="1" checked> Level 1: Common</label>
+          <label><input type="checkbox" name="level" value="1" checked> Level 1: Core</label>
           <label><input type="checkbox" name="level" value="2" checked> Level 2: Intermediate</label>
           <label><input type="checkbox" name="level" value="3" checked> Level 3: Advanced</label>
           <label><input type="checkbox" name="level" value="4" checked> Level 4: Expert</label>
@@ -214,6 +214,7 @@
           <h2 id="wordDetailWord" tabindex="-1"></h2>
           <p id="wordDetailPartOfSpeech" class="word-part" aria-hidden="true"></p>
           <p id="wordDetailMeaning" class="word-meaning"></p>
+          <p id="wordDetailExample" class="word-example hidden"></p>
           <p id="wordDetailRecord" class="word-record"></p>
 
           <div class="word-primary-actions">
@@ -244,7 +245,7 @@
             <div id="wordLevelControl" class="hidden">
               <label for="wordLevelSelect">Study level</label>
               <select id="wordLevelSelect">
-                <option value="1">Level 1: Common</option>
+                <option value="1">Level 1: Core</option>
                 <option value="2">Level 2: Intermediate</option>
                 <option value="3">Level 3: Advanced</option>
                 <option value="4">Level 4: Expert</option>
@@ -379,8 +380,8 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.2</strong></p>
-        <p>Accessibility-first vocabulary practice with a 5,000-word curriculum and live Merriam-Webster reference data.</p>
+        <p><strong>Version 1.3</strong></p>
+        <p>Accessibility-first vocabulary practice with a curated 1,155-word study bank and live Merriam-Webster reference data.</p>
       </section>
       <section class="builder-panel">
         <h3>Navigation</h3>

@@ -375,7 +375,8 @@ body { min-height: 100vh; }
 }
 .word-detail-card h2 { margin: 0; font-size: clamp(2rem, 9vw, 3rem); line-height: 1.08; overflow-wrap: anywhere; }
 .word-part { margin: .25rem 0 .65rem; color: var(--muted); font-style: italic; }
-.word-meaning { margin: .4rem 0 .55rem; font-size: 1.16rem; line-height: 1.45; font-weight: 620; }
+.word-meaning { margin: .4rem 0 .45rem; font-size: 1.16rem; line-height: 1.45; font-weight: 620; }
+.word-example { margin: .2rem 0 .7rem; color: var(--muted); line-height: 1.45; }
 .word-record { margin: .25rem 0 .9rem; color: var(--muted); font-size: .9rem; }
 .word-primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin: .85rem 0; }
 .word-primary-actions button { min-height: 58px; }
