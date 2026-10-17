@@ -376,7 +376,15 @@ body { min-height: 100vh; }
 .word-detail-card h2 { margin: 0; font-size: clamp(2rem, 9vw, 3rem); line-height: 1.08; overflow-wrap: anywhere; }
 .word-part { margin: .25rem 0 .65rem; color: var(--muted); font-style: italic; }
 .word-meaning { margin: .4rem 0 .45rem; font-size: 1.16rem; line-height: 1.45; font-weight: 620; }
-.word-example { margin: .2rem 0 .7rem; color: var(--muted); line-height: 1.45; }
+.feedback-example { margin: .5rem 0 .8rem; line-height: 1.5; }
+.word-pronunciation { margin: .7rem 0; }
+.word-pronunciation button { min-height: 52px; margin: .25rem 0; }
+.word-pronunciation p { margin: .25rem 0; }
+.word-syllables { color: var(--muted); }
+.word-examples { margin: .9rem 0; }
+.word-examples h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+.word-examples ul { padding-left: 1.35rem; margin: .35rem 0 .7rem; line-height: 1.5; }
+.word-examples li + li { margin-top: .45rem; }
 .word-record { margin: .25rem 0 .9rem; color: var(--muted); font-size: .9rem; }
 .word-primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin: .85rem 0; }
 .word-primary-actions button { min-height: 58px; }

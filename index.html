@@ -148,6 +148,7 @@
         <section id="feedbackPanel" class="feedback hidden" role="region" aria-labelledby="feedbackHeading">
           <h3 id="feedbackHeading" tabindex="-1"></h3>
           <p id="feedbackText"></p>
+          <p id="feedbackExample" class="feedback-example hidden"></p>
           <div class="feedback-actions">
             <button id="nextQuestionButton" class="primary" type="button">Next word</button>
             <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
@@ -214,7 +215,15 @@
           <h2 id="wordDetailWord" tabindex="-1"></h2>
           <p id="wordDetailPartOfSpeech" class="word-part" aria-hidden="true"></p>
           <p id="wordDetailMeaning" class="word-meaning"></p>
-          <p id="wordDetailExample" class="word-example hidden"></p>
+          <section id="wordPronunciation" class="word-pronunciation" aria-label="Pronunciation">
+            <p id="wordSyllables" class="word-syllables hidden"></p>
+            <button id="wordPronounceButton" type="button" class="hidden">Hear pronunciation</button>
+            <p id="wordPronounceStatus" class="help-text"></p>
+          </section>
+          <section id="wordExamples" class="word-examples hidden" aria-labelledby="wordExamplesHeading">
+            <h3 id="wordExamplesHeading">Examples in context</h3>
+            <ul id="wordExampleList"></ul>
+          </section>
           <p id="wordDetailRecord" class="word-record"></p>
 
           <div class="word-primary-actions">
@@ -225,6 +234,10 @@
           <details id="wordDefinitionsDetails" class="word-disclosure hidden">
             <summary>More definitions</summary>
             <ol id="wordDefinitionList"></ol>
+          </details>
+          <details id="wordOriginDetails" class="word-disclosure hidden">
+            <summary>Word origin</summary>
+            <p id="wordOriginText"></p>
           </details>
 
           <section class="word-section" aria-labelledby="wordRelatedHeading">
@@ -380,7 +393,7 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.3</strong></p>
+        <p><strong>Version 1.4</strong></p>
         <p>Accessibility-first vocabulary practice with a curated 1,155-word study bank and live Merriam-Webster reference data.</p>
       </section>
       <section class="builder-panel">

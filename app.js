@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.3';
+  const APP_VERSION = '1.4';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -40,6 +40,7 @@
   let session = null;
   let installPrompt = null;
   let currentWordDetail = null;
+  let pronunciationAudio = null;
   let wordPage = 0;
   let historyLimit = 25;
   const transientDictionary = new Map();
@@ -1046,13 +1047,85 @@
       .slice(0,4);
   }
 
-  function supplementalExampleFromEntry(entry) {
-    const examples=Array.isArray(entry?.suppl?.examples) ? entry.suppl.examples : [];
-    for (const example of examples) {
-      const cleaned=cleanMwText(example?.t);
-      if (cleaned) return cleaned;
+  // A verbal illustration belongs to a specific Merriam-Webster sense. Keep it
+  // together with that sense rather than mixing examples from unrelated meanings.
+  function senseIllustrations(entry) {
+    const senses=[];
+    function visit(node) {
+      if (Array.isArray(node)) {
+        if (node.length===2 && (node[0]==='sense' || node[0]==='bs') && node[1]?.dt) {
+          const sense=node[1];
+          const definitionParts=[];
+          const examples=[];
+          for (const part of sense.dt) {
+            if (!Array.isArray(part)) continue;
+            if (part[0]==='text') definitionParts.push(cleanMwText(part[1]));
+            if (part[0]==='vis' && Array.isArray(part[1])) {
+              for (const illustration of part[1]) {
+                const value=cleanMwText(illustration?.t);
+                if (value) examples.push(value);
+              }
+            }
+          }
+          senses.push({definition:definitionParts.filter(Boolean).join(' '),examples});
+          if (sense.sdsense) visit(['sense',sense.sdsense]);
+          return;
+        }
+        for (const child of node) visit(child);
+      } else if (node && typeof node==='object') {
+        for (const value of Object.values(node)) visit(value);
+      }
     }
-    return '';
+    visit(entry?.def || []);
+    return senses;
+  }
+
+  function looksLikeSentence(example) {
+    const text=String(example || '').trim();
+    // Avoid presenting dictionary fragments as complete sentences.
+    if (!/[.!?][”"']?$/.test(text)) return false;
+    return text.split(/\s+/).length >= 5;
+  }
+
+  function examplesForTeachingSense(entry, definition) {
+    const senses=senseIllustrations(entry);
+    const target=String(definition || '');
+    let chosen=senses[0] || null;
+    let score=0;
+    for (const sense of senses) {
+      const similarity=definitionSimilarity(target,sense.definition);
+      if (similarity>score && similarity>=0.40) {
+        chosen=sense;
+        score=similarity;
+      }
+    }
+    // If that sense has no example, do not steal one from an unrelated sense.
+    const direct=chosen?.examples || [];
+    const supplemental=Array.isArray(entry?.suppl?.examples) ? entry.suppl.examples.map(item=>cleanMwText(item?.t)).filter(Boolean) : [];
+    // Supplemental examples are not sense-linked. Use only when the entry has
+    // one dictionary sense, or no sense-linked examples exist in the entry.
+    const canUseSupplemental=senses.length<=1 || senses.every(sense=>!sense.examples.length);
+    const candidates=direct.length ? direct : (canUseSupplemental ? supplemental : []);
+    const uniqueExamples=[...new Set(candidates.map(value=>String(value).trim()).filter(Boolean))];
+    // Prefer a full sentence when Merriam-Webster supplied one, while retaining
+    // accurate shorter usage illustrations rather than fabricating sentences.
+    uniqueExamples.sort((a,b)=>Number(looksLikeSentence(b))-Number(looksLikeSentence(a)));
+    return uniqueExamples.slice(0,3);
+  }
+
+  function pronunciationAudioUrl(entry) {
+    const pronunciations=[...(Array.isArray(entry?.hwi?.prs) ? entry.hwi.prs : []),...(Array.isArray(entry?.prs) ? entry.prs : [])];
+    const file=pronunciations.find(pr=>typeof pr?.sound?.audio==='string')?.sound?.audio || '';
+    if (!/^[a-z0-9_-]+$/i.test(file)) return '';
+    const folder=file.startsWith('bix') ? 'bix' : file.startsWith('gg') ? 'gg' : /^[^a-z]/i.test(file) ? 'number' : file[0].toLowerCase();
+    return `https://media.merriam-webster.com/audio/prons/en/us/mp3/${folder}/${file}.mp3`;
+  }
+
+  function wordOrigin(entry) {
+    const parts=Array.isArray(entry?.et) ? entry.et : [];
+    const text=parts.filter(part=>Array.isArray(part) && part[0]==='text')
+      .map(part=>cleanMwText(part[1])).filter(Boolean).join(' ');
+    return text.slice(0,450);
   }
 
   const TECHNICAL_ENTRY_LABELS = /\b(?:anatomy|anatomical|medicine|medical|pathology|pathological|botany|botanical|zoology|zoological|chemistry|chemical|biochemistry|geology|geological|microbiology)\b/i;
@@ -1092,6 +1165,7 @@
     const definition = chooseStudyDefinition(studyDefinitions, word);
     const quizDefinition = chooseQuizDefinition(studyDefinitions, word);
     const answerDefinition = chooseAnswerDefinition(studyDefinitions, word);
+    const examples=examplesForTeachingSense(entry,definition);
     if (!definition || !quizDefinition) throw new Error(`No useful quiz definition for ${word}.`);
     return {
       word:String(word || '').toLowerCase(),
@@ -1103,7 +1177,11 @@
       definition,
       quizDefinition,
       answerDefinition,
-      example:supplementalExampleFromEntry(entry),
+      example:examples[0] || '',
+      examples,
+      syllables:String(entry.hwi?.hw || '').replace(/\*/g,'·').replace(/\s+/g,' ').trim(),
+      audioUrl:pronunciationAudioUrl(entry),
+      origin:wordOrigin(entry),
       definitionStyle:learnerDefinitions.length ? 'learner' : 'collegiate',
       source: 'Merriam-Webster Collegiate Dictionary'
     };
@@ -1267,11 +1345,30 @@
     $('wordDetailPartOfSpeech').textContent=dictionary?.partOfSpeech || '';
     $('wordDetailPartOfSpeech').classList.toggle('hidden', !dictionary?.partOfSpeech);
     $('wordDetailMeaning').textContent=dictionary?.definition || dictionary?.shortdefs?.[0] || 'Definition unavailable.';
-    const example=$('wordDetailExample');
-    if (example) {
-      example.textContent=dictionary?.example ? `Example: ${dictionary.example}` : '';
-      example.classList.toggle('hidden', !dictionary?.example);
+    const syllables=String(dictionary?.syllables || '');
+    $('wordSyllables').textContent=syllables && syllables !== detailHeadword ? `Syllable breaks: ${syllables}` : '';
+    $('wordSyllables').classList.toggle('hidden',!syllables || syllables===detailHeadword);
+    const audioAvailable=Boolean(dictionary?.audioUrl);
+    const deviceVoiceAvailable=typeof window.speechSynthesis!=='undefined' && typeof window.SpeechSynthesisUtterance==='function';
+    const pronounceButton=$('wordPronounceButton');
+    pronounceButton.classList.toggle('hidden',!audioAvailable && !deviceVoiceAvailable);
+    pronounceButton.textContent=audioAvailable ? `Hear ${detailHeadword} pronounced` : `Hear ${detailHeadword} (device voice)`;
+    $('wordPronounceStatus').textContent=audioAvailable ? 'Merriam-Webster recording.' : (deviceVoiceAvailable ? 'Device-generated pronunciation; accuracy may vary.' : 'Audio pronunciation unavailable.');
+
+    const examples=Array.isArray(dictionary?.examples) && dictionary.examples.length ? dictionary.examples : (dictionary?.example ? [dictionary.example] : []);
+    const exampleList=$('wordExampleList');
+    exampleList.replaceChildren();
+    for (const value of examples) {
+      const li=document.createElement('li');
+      li.textContent=value;
+      exampleList.appendChild(li);
     }
+    $('wordExamples').classList.toggle('hidden',!examples.length);
+    const origin=String(dictionary?.origin || '');
+    $('wordOriginText').textContent=origin;
+    $('wordOriginDetails').classList.toggle('hidden',!origin);
+    if (!origin) setDetailsOpen($('wordOriginDetails'),false);
+
     $('wordDetailRecord').textContent=state.seen
       ? `${state.correct} correct, ${state.wrong} missed. Accuracy ${accuracy(state.correct,state.correct+state.wrong)}.`
       : (state.markedKnown ? 'Marked as known.' : 'Not studied yet.');
@@ -1314,7 +1411,43 @@
     $('wordDetailContent').classList.remove('hidden');
   }
 
+  function stopWordPronunciation() {
+    if (pronunciationAudio) {
+      pronunciationAudio.pause();
+      pronunciationAudio=null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }
+
+  async function pronounceCurrentWord() {
+    const detail=currentWordDetail;
+    if (!detail?.entry) return;
+    stopWordPronunciation();
+    const pronunciation=detail.entry;
+    if (pronunciation.audioUrl) {
+      const audio=new Audio(pronunciation.audioUrl);
+      pronunciationAudio=audio;
+      try {
+        await audio.play();
+        return;
+      } catch {
+        if (pronunciationAudio===audio) pronunciationAudio=null;
+        // Some browsers prevent external audio playback. Try device speech.
+      }
+    }
+    if (typeof window.speechSynthesis!=='undefined' && typeof window.SpeechSynthesisUtterance==='function') {
+      const utterance=new SpeechSynthesisUtterance(pronunciation.headword || detail.word);
+      utterance.lang='en-US';
+      utterance.rate=0.9;
+      $('wordPronounceStatus').textContent='Device-generated pronunciation; accuracy may vary.';
+      window.speechSynthesis.speak(utterance);
+    } else {
+      $('wordPronounceStatus').textContent='Pronunciation audio could not be played on this device.';
+    }
+  }
+
   async function openWordDetail(word,{entry=null,historyMode='push'}={}) {
+    stopWordPronunciation();
     const normalized=String(word||'').trim().toLowerCase();
     if (!normalized) return;
     currentWordDetail={word:normalized,item:studyWordItem(normalized) || {word:normalized,level:3,collections:[],custom:false},entry:entry||null};
@@ -1726,6 +1859,8 @@
     feedback.className='feedback hidden';
     $('feedbackHeading').textContent='';
     $('feedbackText').textContent='';
+    $('feedbackExample').textContent='';
+    $('feedbackExample').classList.add('hidden');
     $('wordFacts').innerHTML='';
     setDetailsOpen($('feedbackMore'),false);
     setDetailsOpen($('officialDefinitions'),false);
@@ -1819,8 +1954,10 @@
     $('feedbackText').textContent=isCorrect
       ? `${wordAndPart}. ${primaryDefinition}`
       : `${wordAndPart}. ${primaryDefinition}${isPlacement ? '' : ' This word will return later.'}`;
+    const illustration=String(q.target.example || q.target.examples?.[0] || '').trim();
+    $('feedbackExample').textContent=illustration ? `${looksLikeSentence(illustration) ? 'Example sentence' : 'Usage example'}: ${illustration}` : '';
+    $('feedbackExample').classList.toggle('hidden',!illustration);
     $('wordFacts').innerHTML='';
-    if (q.target.example) addFact('Example',q.target.example);
     addFact('Source','Merriam-Webster Collegiate Dictionary');
     renderOfficialDefinitions(q.target);
     if (isPlacement) {
@@ -2317,6 +2454,7 @@
     $('wordUnsaveButton').addEventListener('click',removeCurrentWordFromSaved);
     $('wordPracticeButton').addEventListener('click',()=>{ if(currentWordDetail) practiceWordNow(currentWordDetail.word,currentWordDetail.item?.level||3); });
     $('wordRelatedButton').addEventListener('click',showCurrentWordRelated);
+    $('wordPronounceButton').addEventListener('click',pronounceCurrentWord);
     $('wordKnownButton').addEventListener('click',markCurrentWordKnown);
     $('wordSuspendButton').addEventListener('click',toggleCurrentWordSuspended);
     $('wordLevelSelect').addEventListener('change',e=>{
@@ -2347,7 +2485,7 @@
     window.addEventListener('appinstalled',()=>{ installPrompt=null; updateInstallUI(); showToast('Vocabulary Builder installed.'); });
     window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{ if ((settings.appearance || 'system') === 'system') applyAppearance(); });
     window.addEventListener('popstate',handlePopState);
-    window.addEventListener('pagehide',()=>{ if(session) persistSession(); });
+    window.addEventListener('pagehide',()=>{ stopWordPronunciation(); if(session) persistSession(); });
     $('installButton').addEventListener('click',async()=>{ if(!installPrompt){updateInstallUI();return;} installPrompt.prompt(); await installPrompt.userChoice; installPrompt=null; updateInstallUI(); });
   }
 

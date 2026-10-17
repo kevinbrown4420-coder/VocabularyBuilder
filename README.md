@@ -1,6 +1,14 @@
-# Vocabulary Builder v1.3
+# Vocabulary Builder v1.4
 
-Vocabulary Builder is an accessibility-first vocabulary study PWA. v1.3 keeps the Magoosh-style one-word/four-choice operation that tested well and rebuilds the content layer around a much smaller, deliberately useful study bank.
+Vocabulary Builder is an accessibility-first vocabulary study PWA. v1.4 keeps the Magoosh-style one-word/four-choice operation that tested well and rebuilds the content layer around a much smaller, deliberately useful study bank.
+
+## New in v1.4: Teaching context and pronunciation
+
+- Answer feedback presents a relevant Merriam-Webster example immediately below the meaning when available; it prefers complete example sentences. Shorter dictionary illustrations are labeled *Usage example* instead of being described as full sentences.
+- Word Details now includes up to three examples for the taught meaning, syllable divisions, pronunciation playback, and collapsible word-origin information when available.
+- Official Merriam-Webster recorded pronunciation plays when provided; a clearly labeled device-generated speech alternative is used when a recording is missing or cannot play.
+- Examples from unrelated dictionary senses are deliberately excluded. When the dictionary does not provide a suitable example, the app does not fabricate one.
+- This release does not change storage keys, your saved words, or the v1.3 curated curriculum.
 
 ## Curated study bank
 
@@ -50,11 +58,11 @@ Definitions remain authoritative Merriam-Webster data rather than generated defi
 
 ## Persistent data
 
-v1.3 preserves the established storage identifiers and production origin, so API keys, mastery data, Saved words, and study history remain in place across the update.
+v1.4 preserves the established storage identifiers and production origin, so API keys, mastery data, Saved words, and study history remain in place across the update.
 
 - `vocabTrackerKeysV01`
 - `vocabTrackerProgressV01`
 - `vocabTrackerSettingsV01`
 - `vocabTrackerActiveSessionV01`
 
-The existing batch-capable `api/lookup.js` does not need replacement for v1.3.
+The existing batch-capable `api/lookup.js` does not need replacement for v1.4.
