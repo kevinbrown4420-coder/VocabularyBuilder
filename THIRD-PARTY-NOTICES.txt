@@ -1,6 +1,6 @@
-Vocabulary Tracker v0.6 — curriculum source notices
+Vocabulary Builder — curriculum source notices
 
-The v0.6 seed curriculum contains headwords and app-authored metadata only. It does
+The built-in seed curriculum contains headwords and app-authored metadata only. It does
 not copy Merriam-Webster definitions, synonym lists, antonym lists, or other
 Merriam-Webster reference entries.
 
@@ -40,5 +40,5 @@ Kevin Gimpel, Nathan Schneider, Brendan O'Connor, et al. (2011).
 "Part-of-Speech Tagging for Twitter: Annotation, Features, and Experiments."
 Proceedings of the Annual Meeting of the ACL, Portland, Oregon.
 
-The final Vocabulary Tracker curriculum was further filtered, de-inflected,
+The final Vocabulary Builder curriculum was further filtered, de-inflected,
 leveled, tagged, and supplemented with app-authored practical vocabulary lists.

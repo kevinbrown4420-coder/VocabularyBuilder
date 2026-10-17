@@ -1,4 +1,4 @@
-const CACHE = 'vocab-tracker-v08';
+const CACHE = 'vocab-builder-v09';
 const ASSETS = ['/', '/index.html', '/styles.css', '/curriculum.js', '/app.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', event => {

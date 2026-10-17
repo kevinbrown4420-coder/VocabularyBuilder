@@ -63,5 +63,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Vocabulary Tracker running at http://localhost:${PORT}`);
+  console.log(`Vocabulary Builder running at http://localhost:${PORT}`);
 });

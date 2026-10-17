@@ -1,8 +1,8 @@
 {
-  "name": "accessible-vocabulary-tracker",
-  "version": "0.2.0",
+  "name": "accessible-vocabulary-builder",
+  "version": "0.9.0",
   "private": true,
-  "description": "Accessible personal vocabulary trainer using Merriam-Webster APIs.",
+  "description": "Accessible personal vocabulary builder using Merriam-Webster APIs.",
   "scripts": {
     "start": "node dev-server.js"
   },

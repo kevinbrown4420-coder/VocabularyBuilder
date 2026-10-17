@@ -1,98 +1,96 @@
-# Vocabulary Builder v0.8
+# Vocabulary Builder v0.9
 
-Vocabulary Builder is an accessibility-first personal vocabulary trainer designed for screen-reader use, especially TalkBack and JAWS. It combines a local 5,000-word study curriculum with live Merriam-Webster Dictionary and Thesaurus lookups while keeping API keys and learning progress on the user's device.
+Vocabulary Builder is an accessibility-first personal vocabulary-learning PWA designed primarily for Android TalkBack and Windows screen-reader use. It combines a curated 5,000-word curriculum with live Merriam-Webster Dictionary and Thesaurus data while keeping API keys and study progress on the user's device.
 
-## What is new in v0.8
+## v0.9 goals
 
-- Rebuilds the Home and practice experience around a simpler Vocabulary Builder-style flow: Practice, Levels, Review, then optional tools/progress disclosures.
-- Adds five one-tap level rows with progress bars and direct 10-word practice.
-- Changes Mixed Practice and level practice back to **word → concise meaning** by default, matching the focused word-first interaction of classic vocabulary-builder apps.
-- Keeps the full **5,000-word curriculum** available and increases ordinary Mixed Practice to favor unseen vocabulary: up to 7 new words and 3 review words when possible.
-- Expands the recent-word avoidance window so recently practiced non-due words are less likely to recur unnecessarily.
-- Caps answer-choice definitions at **96 characters and 16 words**. If the target has no safe concise Merriam-Webster short definition, that question automatically switches to definition → word rather than presenting an oversized answer.
-- Replaces the answer-result word **Incorrect** with **Not quite**, removes the historical correct/incorrect record from the immediate result screen, and hides the old question card before result focus. This removes the most likely adjacent/leftover TalkBack source of the word “incorrect” after a correct answer.
-- Keeps the correct result focused directly on a short result heading, with one concise definition, part of speech, source, and mastery. Extra Merriam-Webster definitions are collapsed under a disclosure.
-- Adds **batched dictionary lookup** support. The browser can request up to eight words in one Vercel call; the serverless proxy fetches those Merriam-Webster entries in parallel and the app reuses them in memory across the round.
-- Builds distractors primarily from the current session so the first batched request warms most of the next questions. Remaining session words are prefetched in the background.
-- Makes Word Lookup feel faster by displaying the dictionary result immediately, then loading thesaurus information separately underneath.
-- Keeps all previous storage keys and progress formats unchanged.
+v0.9 is a usability release. The main goal is to make the app feel easy, predictable, and enjoyable rather than merely technically accessible.
 
-## Curriculum design
+### Navigation and TalkBack
 
-`curriculum.js` contains headwords, app-defined difficulty levels, and collection tags only. It contains no Merriam-Webster definitions, synonym lists, or antonym lists.
+- Real in-app browser history gives Android Back meaningful behavior.
+- Back closes the Menu or an open disclosure before leaving the current screen.
+- Leaving an unfinished round preserves it for Resume.
+- A compact app bar always identifies the current screen and exposes Back, Menu, or End round only when appropriate.
+- Menu content is isolated from the page behind it so TalkBack cannot drift into background controls.
+- Screen changes focus a screen heading or the relevant word/result rather than an arbitrary container.
+- Controls use self-identifying labels such as `End round`, `Clear recent lookups`, `Word details`, `Vocabulary library`, and `Word history`.
 
-Current level distribution:
+### Home
 
-- Level 1 — Common: 1,500
-- Level 2 — Intermediate: 1,450
-- Level 3 — Advanced: 1,150
-- Level 4 — Expert: 750
-- Level 5 — Challenge: 150
+Home is intentionally small and task-oriented:
 
-The curriculum includes a deliberately tagged Practical Academic & Professional layer plus topic collections for writing/punctuation, reasoning, communication, work/projects, business/analytics, accessibility/technology, government/contracting, academics/research, housing/practical life, precision/distinctions, and literary/rhetorical vocabulary.
+1. Practice — Resume when needed, Mixed practice, and New words.
+2. Levels — direct Level 1 through Level 5 practice.
+3. Review — appears only when something is actually due or difficult.
+4. Explore — Dictionary, Saved words, Collections, and Custom practice.
+5. Progress — one concise summary and one View progress action.
 
-Difficulty is an app study aid, not a Merriam-Webster rating.
+Setup prompts disappear after setup is complete. If setup is incomplete, Home provides a one-tap `Set up dictionary` action.
 
-## Reference-content architecture
+### Word-centered learning
 
-Merriam-Webster remains the authoritative live reference source. Correct definitions and definition distractors come from Merriam-Webster's Collegiate Dictionary. The local curriculum decides which words may be studied; it does not contain copied dictionary content.
+Library, Word history, Dictionary results, quiz results, and related words all lead to one consistent Word details screen. It provides:
 
-v0.8 uses a batch-capable same-origin proxy to reduce round-trip overhead. A batch contains at most eight requested headwords and the proxy performs those upstream requests in parallel. Responses remain `no-store`. The app keeps dictionary/thesaurus results only in transient in-memory maps for the active app session.
+- the word, part of speech, and concise Merriam-Webster meaning;
+- learning status and performance;
+- Save word when the word is not already saved;
+- Practice word;
+- optional additional definitions;
+- on-demand synonyms and antonyms;
+- Mark as known / Pause review controls;
+- study-level control for manually added words.
 
-Thesaurus information is no longer required to construct every question. It is retrieved on demand for the result/details and lookup experiences, which substantially reduces question-generation delay.
+Word-to-word navigation preserves exact Back history. Saved curriculum words are tracked without being duplicated.
+
+### Practice and results
+
+The question screen centers one word or definition and four large answer choices. The result order is deliberately short for TalkBack:
+
+1. Correct / Not quite.
+2. Concise meaning.
+3. Lucky guess, when relevant.
+4. Next word.
+5. Save word, when not already saved.
+6. Word details.
+7. Optional More about this word disclosure.
+
+Quiz answer meanings are limited to 96 characters and 16 words. When Merriam-Webster does not provide a suitable concise answer meaning, the app uses definition-to-word format for that question instead of truncating an official definition into a misleading fragment.
+
+### Lists and secondary screens
+
+- Vocabulary Library displays 25 words at a time rather than a long 50-word page.
+- Search is always visible; less-used Library filters live under one Filters disclosure.
+- Word History starts with 25 recent words and loads 25 more on request.
+- Saved words is directly reachable from both Home and Menu.
+- Progress statistics are complete label-value rows for predictable TalkBack reading.
+- Settings keeps Appearance visible while Dictionary connection and Backup/reset live in named disclosures.
+
+### Performance
+
+v0.9 includes the batch-capable lookup proxy. A question can request a small group of Merriam-Webster entries in one browser request; the Vercel proxy performs those reference lookups in parallel. The app reuses entries in memory across the round. Dictionary lookup shows the dictionary result without waiting for the thesaurus.
+
+Future PWA updates can also reload automatically when a new service worker takes control while the user is safely on Home. If an update arrives elsewhere, the app defers the reload until Home rather than interrupting a round.
+
+## Curriculum
+
+The built-in curriculum contains exactly 5,000 unique headwords across five app-defined levels and 12 overlapping collections. The curriculum stores headwords and study metadata only; Merriam-Webster definitions, synonyms, and antonyms are retrieved live when needed.
 
 ## Persistent local data
 
-v0.8 intentionally keeps the established storage keys so an update on the same production origin carries forward existing data:
+v0.9 deliberately preserves the established storage identifiers:
 
-- `vocabTrackerKeysV01` — local Merriam-Webster keys
-- `vocabTrackerProgressV01` — mastery, custom words, history, placement, statistics, suspended words, etc.
-- `vocabTrackerSettingsV01` — practice and accessibility settings
-- `vocabTrackerActiveSessionV01` — sanitized resumable-session metadata
+- `vocabTrackerKeysV01`
+- `vocabTrackerProgressV01`
+- `vocabTrackerSettingsV01`
+- `vocabTrackerActiveSessionV01`
 
-The 5,000 static curriculum words live in `curriculum.js`; they do not create 5,000 progress records in local storage. Progress exports contain study progress/settings but do not include API keys.
+Updating the app on the same production origin preserves compatible progress, saved words, settings, and local API keys. Do not clear browser/site data as part of a normal update.
 
-## Accessibility design
+## Reference content
 
-- Native semantic buttons, inputs, selects, headings, regions, details/summary disclosures, and labels.
-- Vertical Menu navigation instead of horizontally scrolling tabs.
-- Home is organized as a short Practice → Levels → Review flow, with secondary tools collapsed below it.
-- Every level row is one TalkBack target containing the level name and its progress text.
-- Question counter is no longer a live region, reducing unsolicited announcements while the answer result is being spoken.
-- After answering, the question card is hidden and focus moves to exactly `Correct` or `Not quite`.
-- The immediate result screen contains no historical “incorrect” count.
-- Answer choices are concise and individually focusable.
-- At most 50 library words are rendered at once; Word History remains newest-first and capped at 500 unique words.
-- Optional Focused Practice hides global navigation/header/footer during an active quiz.
-
-## Core files
-
-- `index.html` — semantic user interface
-- `styles.css` — responsive Vocabulary Builder-style layout plus light/dark themes
-- `app.js` — practice, batching, progress, lookup, history, collections, navigation, and persistence
-- `curriculum.js` — 5,000 seed headwords, levels, and collection tags
-- `api/lookup.js` — single and batched same-origin Vercel proxy for Merriam-Webster lookups
-- `manifest.webmanifest` / `sw.js` — installable PWA shell and update cache
-- `THIRD-PARTY-NOTICES.txt` — curriculum-source attribution and notices
+Definitions are retrieved from Merriam-Webster's Collegiate Dictionary API. Synonyms and antonyms are retrieved from Merriam-Webster's Collegiate Thesaurus API. The application is not endorsed by Merriam-Webster, Inc.
 
 ## Deployment
 
-Keep the same production Vercel origin so browser local storage carries forward. v0.8 changes the service-worker cache name to `vocab-tracker-v08`.
-
-The update requires these runtime files to be replaced together:
-
-- `app.js`
-- `index.html`
-- `styles.css`
-- `sw.js`
-- `manifest.webmanifest`
-- `api/lookup.js`
-
-`curriculum.js` is unchanged from v0.7 and remains the 5,000-word catalog.
-
-## Known limitations
-
-- Natural-language multiple choice can never be guaranteed perfectly unambiguous. v0.8 rejects duplicate/overlapping definitions and prefers semantically separated session distractors, but the app still relies on heuristic screening.
-- A small number of seed headwords may not produce a usable Merriam-Webster Collegiate entry. The app skips and remembers those locally when encountered.
-- Network access is still required for a word's first reference lookup in a fresh app session.
-- Pronunciation audio and example sentences are not yet surfaced.
+Keep the existing Vercel project and production origin. v0.9 requires the updated root application files and the updated `api/lookup.js` batch proxy. See `UPGRADE-v0.9.txt` in the release package.
