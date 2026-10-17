@@ -1,21 +1,19 @@
-# Vocabulary Tracker v0.6
+# Vocabulary Tracker v0.7
 
 Vocabulary Tracker is an accessibility-first personal vocabulary trainer designed for screen-reader use, especially TalkBack and JAWS. It combines a local study curriculum with live Merriam-Webster Dictionary and Thesaurus lookups while keeping API keys and learning progress on the user's device.
 
-## What is new in v0.6
+## What is new in v0.7
 
-- Expands the built-in curriculum from 100 placement words to **5,000 unique seed headwords** for everyday practice.
-- Keeps the original 100 words as the fixed 15-question placement-check pool so placement behavior remains comparable across versions.
-- Adds **12 overlapping topic collections**, led by **Practical academic & professional** with 1,087 deliberately tagged high-utility words.
-- Adds practical vocabulary for writing and punctuation, precise everyday distinctions, reasoning, college/research, work/projects, negotiation, accessibility/technology, government/contracting, business/analytics, housing/practical life, and literary/rhetorical language.
-- Rebuilds Home for touch exploration with separate TalkBack-friendly controls such as `Mastered: 12` and `Accuracy: 84%` rather than a visually grouped statistics grid.
-- Adds **Word History**, keeping the 500 most recently encountered unique words so a word can be recovered without remembering its spelling.
-- Replaces the potentially huge word list with a **paged Vocabulary Library** that displays at most 50 matches at a time and supports search, level, collection, source, mastery, and suspended/active filters.
-- Adds **Collections** browsing and one-button collection practice.
-- Adds Low / Balanced / High **new-word mix** controls. Balanced practice aims for about 50% unseen targets when possible; Low uses about 25% and High about 70%.
-- Temporarily deprioritizes the 30 most recently practiced non-due words while still prioritizing due reviews, difficult words, and personal vocabulary.
-- Remembers unusable curriculum headwords if Merriam-Webster has no usable exact entry and skips them in future sessions instead of repeatedly breaking practice.
-- Preserves all v0.5 features: dark mode, resumable sessions, recent lookups, expandable word actions, suspension, mark-known, personal-word difficulty, and lucky-guess correction.
+- Fixes the TalkBack feedback race where the previously visible result could be announced after a new answer. Feedback is now fully updated while hidden, then revealed, and focus moves directly to the `Correct` or `Incorrect` heading.
+- Updates each answer button's accessible label after answering so TalkBack explicitly identifies **correct answer**, **your answer**, and **incorrect** when applicable.
+- Makes **Definition to word** the recommended/default question style because it is less prone to multiple plausible definition choices.
+- Keeps every definition sourced live from Merriam-Webster, while improving the *question-construction* layer separately: target synonyms/antonyms are excluded from distractors, near-duplicate definitions are rejected, duplicate headwords are rejected, and candidate definitions are screened before a question is shown.
+- Shows up to three official Merriam-Webster short definitions after each answer as separate list items, plus part of speech and an explicit source label.
+- Adds **Quick Play**, a 10-question broad round that intentionally draws across the full 5,000-word curriculum instead of silently reusing old custom level settings.
+- Adds **Discover**, a 10-question round made from unseen curriculum words across all five levels.
+- Keeps **Custom Practice** for level, collection, source, novelty, and question-style control.
+- Reorganizes Home into large TalkBack-friendly study cards inspired by the simple Play / Learn / Dictionary / Lists structure used by mature vocabulary-learning apps, without copying another product's branding or visual identity.
+- Preserves v0.6 Collections, Word History, the paged Vocabulary Library, the practical academic/professional layer, and all v0.5 persistence/accessibility features.
 
 ## Curriculum design
 
@@ -43,7 +41,7 @@ The app's transient in-memory caches avoid repeated lookups during the same app 
 
 ## Persistent local data
 
-v0.6 intentionally keeps the established storage keys so an update on the same production origin carries forward existing data:
+v0.7 intentionally keeps the established storage keys so an update on the same production origin carries forward existing data:
 
 - `vocabTrackerKeysV01` — local Merriam-Webster keys
 - `vocabTrackerProgressV01` — mastery, custom words, history, placement, statistics, suspended words, etc.
@@ -77,9 +75,17 @@ Progress exports contain study progress/settings but do not include API keys.
 
 ## Deployment
 
-The production project is intended to remain on the same Vercel origin so local browser storage continues to work across releases. `curriculum.js` must be deployed alongside the existing static files and is included in the v0.6 service-worker cache.
+The production project is intended to remain on the same Vercel origin so local browser storage continues to work across releases. `curriculum.js` must be deployed alongside the existing static files and is included in the v0.7 service-worker cache.
 
 No Vercel environment variable is required for the Merriam-Webster keys because the user enters those keys locally in Settings.
+
+## Question-source and distractor design
+
+The **correct definition is always retrieved from Merriam-Webster's Collegiate® Dictionary**. Distractor definitions are also retrieved from Merriam-Webster entries rather than generated by the app.
+
+v0.7 adds a validation layer before displaying a multiple-choice question. It excludes words returned as synonyms/antonyms of the target, avoids duplicate headwords, rejects exact duplicate definitions, and uses token-overlap screening to reject definitions that are too similar to the target. It also prefers compatible parts of speech and nearby study levels when several safe distractors are available.
+
+No heuristic can prove that every English multiple-choice distractor is semantically impossible. For that reason, Definition-to-word is now the recommended mode: one official definition is the prompt and the app chooses word distractors after relationship/similarity screening.
 
 ## Known limitations
 
@@ -88,3 +94,4 @@ No Vercel environment variable is required for the Merriam-Webster keys because 
 - Topic tags overlap by design and are not an exhaustive ontology.
 - Definitions and thesaurus data require network access unless already available transiently in the current app session.
 - Pronunciation audio and example sentences are not yet surfaced.
+- Multiple-choice ambiguity is reduced substantially in v0.7 but cannot be mathematically eliminated for natural-language definitions.

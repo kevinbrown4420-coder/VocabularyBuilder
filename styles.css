@@ -210,3 +210,18 @@ body.focus-practice #quizArea { margin-top: .25rem; }
   .pagination-controls { grid-template-columns: 1fr; }
   #wordPageStatus { order: -1; text-align: left; }
 }
+
+
+/* v0.7 study dashboard and answer feedback */
+.study-card-grid { display: grid; gap: .75rem; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.study-card { min-height: 96px; width: 100%; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: .25rem; padding: .9rem; }
+.study-card.primary-card { background: var(--accent); color: var(--accent-contrast); }
+.card-title { font-size: 1.08rem; font-weight: 800; }
+.card-description { font-size: .9rem; font-weight: 500; line-height: 1.35; }
+.question-context { margin: -.45rem 0 .7rem; color: var(--muted); font-weight: 650; }
+.official-definitions { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+.official-definitions h4 { margin: 0 0 .5rem; }
+.official-definitions ol { margin: 0; padding-left: 1.5rem; }
+.official-definitions li { margin: .45rem 0; }
+#feedbackHeading:focus { outline: 4px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 520px) { .study-card-grid { grid-template-columns: 1fr; } .study-card { min-height: 84px; } }
