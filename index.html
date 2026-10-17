@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#14324a">
+  <meta name="theme-color" content="#4b1f69">
   <meta name="description" content="Accessible vocabulary practice with a broad 5,000-word curriculum, screened Merriam-Webster questions, collections, history, and persistent progress tracking.">
-  <title>Vocabulary Tracker</title>
+  <title>Vocabulary Builder</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="icon-192.png">
@@ -14,8 +14,8 @@
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="app-header">
     <div>
-      <h1>Vocabulary Tracker</h1>
-      <p class="subtitle">Accessible vocabulary practice and mastery tracking</p>
+      <h1>Vocabulary Builder</h1>
+      <p class="subtitle">Learn, review, and keep moving</p>
     </div>
     <div class="header-actions">
       <button id="menuButton" class="secondary" type="button" aria-expanded="false" aria-controls="mainMenu">Menu</button>
@@ -35,30 +35,57 @@
   </nav>
 
   <main id="main" tabindex="-1">
-    <section id="view-home" class="view" aria-labelledby="homeHeading">
-      <h2 id="homeHeading">Home</h2>
-      <div id="setupNotice" class="notice" role="status"></div>
-      <p id="versionNotice" class="notice hidden" role="status"></p>
-      <section class="home-section" aria-labelledby="homeStudyHeading">
-        <h3 id="homeStudyHeading">Study</h3>
-        <p class="help-text">Quick Play uses the full curriculum. Custom Practice lets you narrow by level, topic, source, or question style.</p>
-        <div class="study-card-grid">
-          <button id="resumeSessionButton" class="study-card primary-card hidden" type="button"><span class="card-title">Resume</span><span class="card-description">Continue your unfinished round.</span></button>
-          <button id="startPracticeButton" class="study-card primary-card" type="button"><span class="card-title">Quick Play</span><span class="card-description">10-question broad mix with review and new words.</span></button>
-          <button id="homeDiscoverButton" class="study-card" type="button"><span class="card-title">Discover</span><span class="card-description">10 unseen words drawn across all five levels.</span></button>
-          <button id="homeCustomButton" class="study-card" type="button"><span class="card-title">Custom Practice</span><span class="card-description">Choose levels, collections, source, and question style.</span></button>
-        </div>
-        <div class="action-stack compact">
-          <button id="reviewDueButton" type="button">Due reviews: 0</button>
-          <button id="reviewMissedButton" type="button">Difficult words: 0</button>
-          <button id="homePersonalButton" type="button">Practice personal words</button>
+    <section id="view-home" class="view builder-home" aria-labelledby="homeHeading">
+      <h2 id="homeHeading">Vocabulary Builder</h2>
+      <div id="setupNotice" class="notice compact-notice" role="status"></div>
+      <p id="versionNotice" class="notice compact-notice hidden" role="status"></p>
+
+      <section class="builder-panel" aria-labelledby="homeStudyHeading">
+        <h3 id="homeStudyHeading">Practice</h3>
+        <div class="builder-action-stack">
+          <button id="resumeSessionButton" class="builder-primary hidden" type="button">Resume unfinished round</button>
+          <button id="startPracticeButton" class="builder-primary" type="button">Mixed practice</button>
+          <button id="homeDiscoverButton" type="button">New words</button>
         </div>
       </section>
 
-      <section class="home-section" aria-labelledby="homeProgressHeading">
-        <h3 id="homeProgressHeading">Progress snapshot</h3>
-        <p class="help-text">Each item below is a separate control so TalkBack can identify the statistic and its number together.</p>
-        <div class="accessible-stat-list">
+      <section class="builder-panel" aria-labelledby="homeLevelsHeading">
+        <h3 id="homeLevelsHeading">Levels</h3>
+        <p class="builder-hint">Choose a level to practice it directly. Progress is based on words you have encountered.</p>
+        <div class="level-stack">
+          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Common</span><span id="homeLevel1Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="2"><span class="level-title">Level 2 · Intermediate</span><span id="homeLevel2Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel2Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="3"><span class="level-title">Level 3 · Advanced</span><span id="homeLevel3Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel3Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="4"><span class="level-title">Level 4 · Expert</span><span id="homeLevel4Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel4Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="5"><span class="level-title">Level 5 · Challenge</span><span id="homeLevel5Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel5Bar" class="level-fill"></span></span></button>
+        </div>
+      </section>
+
+      <section class="builder-panel" aria-labelledby="homeReviewHeading">
+        <h3 id="homeReviewHeading">Review</h3>
+        <div class="builder-action-stack compact">
+          <button id="reviewDueButton" type="button">Due reviews: 0</button>
+          <button id="reviewMissedButton" type="button">Difficult words: 0</button>
+          <button id="homePersonalButton" type="button">Personal words</button>
+        </div>
+      </section>
+
+      <details class="builder-disclosure">
+        <summary>More study options</summary>
+        <div class="builder-action-stack compact">
+          <button id="homeCustomButton" type="button">Custom practice</button>
+          <button id="homeLookupButton" type="button">Dictionary</button>
+          <button id="homeCollectionsButton" type="button">Collections</button>
+          <button id="homeHistoryButton" type="button">Word history</button>
+          <button id="homeLibraryButton" type="button">Vocabulary library</button>
+          <button id="homePlacementButton" type="button">Placement check</button>
+        </div>
+        <p id="homePlacementStatus" class="builder-hint">No placement check completed yet.</p>
+      </details>
+
+      <details class="builder-disclosure">
+        <summary>Progress summary</summary>
+        <div class="accessible-stat-list compact-stats">
           <button id="homeMasteredStat" type="button">Mastered: 0</button>
           <button id="homeLearningStat" type="button">In progress: 0</button>
           <button id="homeSeenStat" type="button">Words encountered: 0</button>
@@ -66,24 +93,7 @@
           <button id="homeAccuracyStat" type="button">Accuracy: —</button>
           <button id="homeStreakStat" type="button">Study streak: 0 days</button>
         </div>
-      </section>
-
-      <section class="home-section" aria-labelledby="homeExploreHeading">
-        <h3 id="homeExploreHeading">Learn and explore</h3>
-        <div class="study-card-grid">
-          <button id="homeLookupButton" class="study-card" type="button"><span class="card-title">Dictionary</span><span class="card-description">Look up any word and add it to your vocabulary.</span></button>
-          <button id="homeCollectionsButton" class="study-card" type="button"><span class="card-title">Collections</span><span class="card-description">Practice related words by topic.</span></button>
-          <button id="homeHistoryButton" class="study-card" type="button"><span class="card-title">History</span><span class="card-description">Find words you encountered recently.</span></button>
-          <button id="homeLibraryButton" class="study-card" type="button"><span class="card-title">Library</span><span class="card-description">Search and filter the full curriculum.</span></button>
-        </div>
-      </section>
-
-      <section class="home-section" aria-labelledby="homePlacementHeading">
-        <h3 id="homePlacementHeading">Placement and levels</h3>
-        <p id="homePlacementStatus" class="notice">No placement check completed yet.</p>
-        <button id="homePlacementButton" type="button">Run 15-question placement check</button>
-        <p class="help-text">The five levels are app-defined study tiers, not Merriam-Webster difficulty ratings.</p>
-      </section>
+      </details>
     </section>
 
     <section id="view-practice" class="view hidden" aria-labelledby="practiceHeading">
@@ -126,8 +136,8 @@
         </select>
         <label for="questionDirection">Question style</label>
         <select id="questionDirection">
-          <option value="word-def">Word to definition</option>
-          <option value="def-word" selected>Definition to word — recommended</option>
+          <option value="word-def" selected>Word to meaning — Vocabulary Builder style</option>
+          <option value="def-word">Definition to word</option>
           <option value="mixed">Mixed</option>
         </select>
         <button id="beginSessionButton" class="primary large" type="button">Begin session</button>
@@ -137,7 +147,7 @@
       </div>
 
       <div id="quizArea" class="hidden">
-        <p id="questionCounter" class="counter" aria-live="polite" aria-atomic="true"></p>
+        <p id="questionCounter" class="counter"></p>
         <div id="loadingQuestion" class="notice hidden" role="status">Loading official dictionary entries…</div>
         <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
           <p id="questionType" class="eyebrow"></p>
@@ -150,10 +160,10 @@
           <h3 id="feedbackHeading" tabindex="-1"></h3>
           <p id="feedbackText"></p>
           <dl id="wordFacts" class="facts"></dl>
-          <section id="officialDefinitions" class="official-definitions hidden" aria-labelledby="officialDefinitionsHeading">
-            <h4 id="officialDefinitionsHeading">Official definitions</h4>
+          <details id="officialDefinitions" class="official-definitions hidden">
+            <summary id="officialDefinitionsHeading">More Merriam-Webster definitions</summary>
             <ol id="officialDefinitionList"></ol>
-          </section>
+          </details>
           <div class="action-stack compact">
             <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
             <p id="confidenceStatus" class="help-text hidden" role="status"></p>
@@ -342,7 +352,7 @@
   </main>
 
   <footer>
-    <p>Vocabulary Tracker v0.7. Progress is stored locally on your device.</p>
+    <p>Vocabulary Builder v0.8. Progress is stored locally on your device.</p>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

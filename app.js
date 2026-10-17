@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '0.7';
+  const APP_VERSION = '0.8';
   const LEVEL_NAMES = {1:'Common',2:'Intermediate',3:'Advanced',4:'Expert',5:'Obscure'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -36,7 +36,7 @@
 
   let keys = loadJson(KEY_STORAGE, {dictionary:'', thesaurus:''});
   let progress = loadJson(PROGRESS_STORAGE, defaultProgress());
-  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'def-word', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:'balanced', focusedPractice:false, appearance:'system', wordActivation:'options', lastVersion:null});
+  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:'balanced', focusedPractice:false, appearance:'system', wordActivation:'options', lastVersion:null});
   let session = null;
   let installPrompt = null;
   let currentLookup = null;
@@ -44,6 +44,9 @@
   let historyLimit = 50;
   const transientDictionary = new Map();
   const transientThesaurus = new Map();
+  const ANSWER_MAX_CHARS = 96;
+  const ANSWER_MAX_WORDS = 16;
+  let prefetchToken = 0;
 
   function defaultProgress() {
     return {
@@ -190,7 +193,7 @@
     const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     const dark = mode === 'dark' || (mode === 'system' && systemDark);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute('content', dark ? '#0d1117' : '#14324a');
+    if (themeMeta) themeMeta.setAttribute('content', dark ? '#0d1117' : '#4b1f69');
   }
 
   function isStandalone() {
@@ -446,6 +449,19 @@
     $('homePersonalButton').disabled = !ready || personalCount===0 || resumable;
     $('reviewDueButton').disabled = !ready || due===0 || resumable;
     $('reviewMissedButton').disabled = !ready || difficult===0 || resumable;
+    for (let level=1; level<=5; level++) {
+      const levelItems=studyItems.filter(item=>item.level===level && !item.custom);
+      const encountered=levelItems.filter(item=>getExistingWordState(item.word).seen>0).length;
+      const masteredLevel=levelItems.filter(item=>getExistingWordState(item.word).mastery===4).length;
+      const total=levelItems.length || 1;
+      const text=`${encountered.toLocaleString()} of ${levelItems.length.toLocaleString()} encountered; ${masteredLevel.toLocaleString()} mastered`;
+      const progressEl=$(`homeLevel${level}Progress`);
+      const barEl=$(`homeLevel${level}Bar`);
+      if (progressEl) progressEl.textContent=text;
+      if (barEl) barEl.style.width=`${Math.min(100,Math.round(encountered/total*100))}%`;
+    }
+    qsa('[data-home-level]').forEach(button => { button.disabled = !ready || resumable; });
+
     const placement = progress.placement;
     $('homePlacementStatus').textContent = placement?.recommendedLevel
       ? `Latest placement recommendation: Level ${placement.recommendedLevel}: ${LEVEL_NAMES[placement.recommendedLevel]}.`
@@ -461,7 +477,7 @@
     $('anotherSessionButton').classList.remove('hidden');
     $('anotherSessionButton').textContent = 'Start another session';
     $('sessionSize').value = String(settings.sessionSize || 10);
-    $('questionDirection').value = settings.direction || 'def-word';
+    $('questionDirection').value = settings.direction || 'word-def';
     $('practiceSource').value = settings.source || 'all';
     $('practiceCollection').value = COLLECTION_MAP.has(settings.collection) ? settings.collection : 'all';
     $('newWordMix').value = ['low','balanced','high'].includes(settings.novelty) ? settings.novelty : 'balanced';
@@ -510,7 +526,7 @@
       const due = pool.filter(({word}) => { const st=getExistingWordState(word); return st.seen>0 && st.nextDue && st.nextDue<=now; });
       const difficult = pool.filter(({word}) => { const st=getExistingWordState(word); return st.seen>0 && st.wrong>0 && st.correct/(st.correct+st.wrong)<0.7; });
       const fresh = pool.filter(({word}) => getExistingWordState(word).seen===0);
-      const recent = recentPracticeWords(30);
+      const recent = recentPracticeWords(80);
       const continuing = pool.filter(({word}) => { const st=getExistingWordState(word); return st.seen>0 && st.mastery<4 && !(st.nextDue && st.nextDue<=now) && !recent.has(word); });
       const mastered = pool.filter(({word}) => getExistingWordState(word).mastery===4 && !recent.has(word));
 
@@ -573,10 +589,44 @@
     return shuffle(selected).slice(0,count);
   }
 
+  function buildLevelSession(level) {
+    const size=10;
+    const recent=recentPracticeWords(100);
+    const pool=allStudyWords().filter(item=>item.level===level && !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
+    const fresh=shuffle(pool.filter(item=>getExistingWordState(item.word).seen===0 && !recent.has(item.word)));
+    const due=shuffle(pool.filter(item=>{ const st=getExistingWordState(item.word); return st.seen>0 && st.nextDue && st.nextDue<=Date.now(); }));
+    const difficult=shuffle(pool.filter(item=>{ const st=getExistingWordState(item.word); return st.wrong>0 && st.correct/(st.correct+st.wrong)<0.7; }));
+    const review=[]; const used=new Set();
+    for (const item of [...due,...difficult,...shuffle(pool.filter(item=>getExistingWordState(item.word).seen>0 && !recent.has(item.word)))]) {
+      if (!used.has(item.word)) { used.add(item.word); review.push(item); }
+    }
+    const selected=[...review.slice(0,3),...fresh.slice(0,7)];
+    if (selected.length<size) {
+      const chosen=new Set(selected.map(item=>item.word));
+      selected.push(...shuffle(pool.filter(item=>!chosen.has(item.word))).slice(0,size-selected.length));
+    }
+    if (!selected.length) return null;
+    return {mode:'level',queue:shuffle(selected.slice(0,size)).map(item=>({...item,repeat:false})),index:0,answered:0,correct:0,current:null,completed:false,
+      direction:'word-def',levels:[level],source:'all',collection:'all',novelty:'high',plannedCount:Math.min(size,selected.length)};
+  }
+
+  async function beginLevelSession(level) {
+    if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
+    if (!session && loadSavedSession()) {
+      showToast('Resume or end your unfinished session before starting a new round.');
+      switchView('home');
+      return;
+    }
+    const built=buildLevelSession(Number(level));
+    if (!built) { showToast('No words are available in this level.'); return; }
+    switchView('practice',false);
+    startBuiltSession(built);
+  }
+
   function buildQuickSession(kind='quick') {
     const size=10;
     const now=Date.now();
-    const recent=recentPracticeWords(40);
+    const recent=recentPracticeWords(100);
     const pool=allStudyWords().filter(item => !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
     const fresh=pool.filter(item => getExistingWordState(item.word).seen===0);
     const due=pool.filter(item => { const st=getExistingWordState(item.word); return st.seen>0 && st.nextDue && st.nextDue<=now; });
@@ -590,7 +640,7 @@
       for (const item of [...shuffle(due), ...shuffle(difficult), ...shuffle(continuing)]) {
         if (!reviewSeen.has(item.word)) { reviewSeen.add(item.word); review.push(item); }
       }
-      const reviewTarget=Math.min(5,review.length);
+      const reviewTarget=Math.min(3,review.length);
       const reviewPick=review.slice(0,reviewTarget);
       const freshPick=chooseBroadFresh(fresh,size-reviewPick.length);
       selected=shuffle([...reviewPick,...freshPick]);
@@ -604,7 +654,7 @@
       mode:kind==='discover' ? 'discover' : 'quick',
       queue:selected.slice(0,size).map(item=>({...item,repeat:false})),
       index:0, answered:0, correct:0, current:null, completed:false,
-      direction:'def-word', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:kind==='discover'?'high':'balanced', plannedCount:Math.min(size,selected.length)
+      direction:'word-def', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:kind==='discover'?'high':'balanced', plannedCount:Math.min(size,selected.length)
     };
   }
 
@@ -692,21 +742,38 @@
     return overlap / Math.min(left.size, right.size);
   }
 
+  function definitionWordCount(text) {
+    return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function isConciseAnswerDefinition(text) {
+    const value=String(text || '').trim();
+    if (!value) return false;
+    return value.length <= ANSWER_MAX_CHARS && definitionWordCount(value) <= ANSWER_MAX_WORDS;
+  }
+
   function chooseStudyDefinition(shortdefs, word) {
     const normalizedWord = normalizeWordForMatch(word);
     const defs = [...new Set((shortdefs || []).map(value => String(value || '').trim()).filter(Boolean))];
     const useful = defs.filter(definition => {
       const tokens = definitionTokens(definition);
       const normalizedDefinition = normalizeWordForMatch(definition);
-      return tokens.length >= 2 && normalizedDefinition !== normalizedWord && definition.length <= 220;
+      return tokens.length >= 2 && normalizedDefinition !== normalizedWord;
     });
-    return useful[0] || defs[0] || '';
+    const ordered=(useful.length ? useful : defs).sort((a,b)=>a.length-b.length);
+    return ordered[0] || '';
   }
 
-  async function getDictionary(word) {
-    const cacheKey = String(word || '').toLowerCase();
-    if (transientDictionary.has(cacheKey)) return transientDictionary.get(cacheKey);
-    const data = await apiLookup('dictionary', word, keys.dictionary);
+  function chooseAnswerDefinition(shortdefs, word) {
+    const normalizedWord = normalizeWordForMatch(word);
+    const defs=[...new Set((shortdefs || []).map(value => String(value || '').trim()).filter(Boolean))]
+      .filter(definition => definitionTokens(definition).length >= 2 && normalizeWordForMatch(definition)!==normalizedWord)
+      .filter(isConciseAnswerDefinition)
+      .sort((a,b)=>a.length-b.length);
+    return defs[0] || '';
+  }
+
+  function parseDictionaryData(word, data) {
     if (!Array.isArray(data)) throw new Error('Unexpected dictionary response.');
     if (data.length && typeof data[0] === 'string') throw new Error(`No exact dictionary entry for ${word}.`);
     const entries = data.filter(item => item && typeof item==='object' && Array.isArray(item.shortdef) && item.shortdef.length);
@@ -717,17 +784,98 @@
     const entry = exact[0] || stemMatches[0] || entries[0];
     const shortdefs = [...new Set(entry.shortdef.map(value => String(value || '').trim()).filter(Boolean))].slice(0,3);
     const definition = chooseStudyDefinition(shortdefs, word);
+    const answerDefinition = chooseAnswerDefinition(shortdefs, word);
     if (!definition) throw new Error(`No usable definition for ${word}.`);
-    const result = {
-      word: cacheKey,
+    return {
+      word:String(word || '').toLowerCase(),
       headword: normalizeHeadword(entry.hwi?.hw) || word,
       partOfSpeech: entry.fl || '',
       shortdefs,
       definition,
+      answerDefinition,
       source: 'Merriam-Webster Collegiate Dictionary'
     };
-    transientDictionary.set(cacheKey, result);
+  }
+
+  async function apiLookupBatch(kind, words, apiKey) {
+    const requested=[...new Set((words || []).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean))].slice(0,8);
+    if (!requested.length) return [];
+    try {
+      const response = await fetch('/api/lookup', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify({kind,words:requested,apiKey})
+      });
+      const data = await response.json().catch(() => ({error:'Unreadable response.'}));
+      if (!response.ok || !Array.isArray(data.results)) throw new Error(data.error || 'Batch lookup unavailable.');
+      return data.results;
+    } catch {
+      return Promise.all(requested.map(async word => {
+        try { return {word,status:200,data:await apiLookup(kind,word,apiKey)}; }
+        catch (error) { return {word,status:502,error:error.message || 'Lookup failed.'}; }
+      }));
+    }
+  }
+
+  async function getDictionary(word) {
+    const cacheKey = String(word || '').toLowerCase();
+    if (transientDictionary.has(cacheKey)) return transientDictionary.get(cacheKey);
+    const data = await apiLookup('dictionary', word, keys.dictionary);
+    const result=parseDictionaryData(word,data);
+    transientDictionary.set(cacheKey,result);
     return result;
+  }
+
+  async function getDictionaryBatch(words) {
+    const requested=[...new Set((words || []).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean))];
+    const results=new Map();
+    for (const word of requested) if (transientDictionary.has(word)) results.set(word,{entry:transientDictionary.get(word)});
+    const missing=requested.filter(word=>!transientDictionary.has(word));
+    for (let i=0;i<missing.length;i+=8) {
+      const chunk=missing.slice(i,i+8);
+      let rows;
+      try { rows=await apiLookupBatch('dictionary',chunk,keys.dictionary); }
+      catch (error) {
+        for (const word of chunk) results.set(word,{error});
+        continue;
+      }
+      const rowMap=new Map(rows.map(row=>[String(row.word||'').toLowerCase(),row]));
+      for (const word of chunk) {
+        const row=rowMap.get(word);
+        if (!row || row.error || Number(row.status)>=400) {
+          results.set(word,{error:new Error(row?.error || `Lookup failed (${row?.status || 'unknown'}).`)});
+          continue;
+        }
+        try {
+          const entry=parseDictionaryData(word,row.data);
+          transientDictionary.set(word,entry);
+          results.set(word,{entry});
+        } catch (error) {
+          results.set(word,{error});
+        }
+      }
+    }
+    return results;
+  }
+
+  async function prefetchSessionDictionary(fromIndex=0) {
+    if (!session?.queue?.length || !keys.dictionary) return;
+    const token=++prefetchToken;
+    const words=[];
+    for (const item of session.queue.slice(fromIndex)) {
+      const word=String(item.word||'').toLowerCase();
+      if (word && !transientDictionary.has(word) && !words.includes(word)) words.push(word);
+      if (words.length>=8) break;
+    }
+    if (!words.length) return;
+    try {
+      const batch=await getDictionaryBatch(words);
+      if (token!==prefetchToken) return;
+      for (const [word,result] of batch) {
+        if (result.error && isUnusableDictionaryError(result.error) && CURRICULUM_MAP.has(word)) markInvalidSeed(word);
+      }
+    } catch {}
   }
 
   async function getThesaurus(word) {
@@ -1012,7 +1160,6 @@
     try {
       const data = await apiLookup('dictionary', word, keys.dictionary);
       if (!Array.isArray(data)) throw new Error('Unexpected dictionary response.');
-
       if (!data.some(item => item && typeof item === 'object')) {
         const suggestions = data.filter(item => typeof item === 'string');
         status.textContent = suggestions.length
@@ -1022,27 +1169,15 @@
         return;
       }
 
-      const entry = data.find(item => item && typeof item === 'object' && Array.isArray(item.shortdef) && item.shortdef.length)
-        || data.find(item => item && typeof item === 'object');
-      if (!entry || !Array.isArray(entry.shortdef) || !entry.shortdef.length) {
-        status.textContent = `Merriam-Webster returned an entry for ${raw}, but it did not include a usable short definition.`;
-        return;
-      }
-
-      const displayWord = normalizeHeadword(entry.hwi?.hw) || raw;
-      const storedWord = displayWord.toLowerCase();
-      const dictionary = {
-        word: storedWord,
-        headword: displayWord,
-        partOfSpeech: entry.fl || '',
-        shortdefs: entry.shortdef.filter(Boolean).slice(0,3),
-        definition: entry.shortdef[0]
-      };
-      transientDictionary.set(storedWord, dictionary);
-      currentLookup = dictionary;
+      const dictionary=parseDictionaryData(word,data);
+      const storedWord=String(dictionary.headword || word).toLowerCase();
+      dictionary.word=storedWord;
+      transientDictionary.set(storedWord,dictionary);
+      transientDictionary.set(word,dictionary);
+      currentLookup=dictionary;
       rememberLookup(storedWord);
 
-      $('lookupResultHeading').textContent = displayWord;
+      $('lookupResultHeading').textContent = dictionary.headword || raw;
       $('lookupPartOfSpeech').textContent = dictionary.partOfSpeech ? `Part of speech: ${dictionary.partOfSpeech}` : '';
       const definitions = $('lookupDefinitions');
       definitions.innerHTML = '';
@@ -1059,25 +1194,29 @@
 
       const thesaurusPanel = $('lookupThesaurus');
       thesaurusPanel.innerHTML = '';
-      if (keys.thesaurus) {
-        try {
-          const thesaurus = await getThesaurus(storedWord);
-          renderThesaurusWithAdd(thesaurusPanel, thesaurus, () => Number($('lookupLevel').value) || 3);
-        } catch (error) {
-          const p = document.createElement('p');
-          p.textContent = `Thesaurus lookup was unavailable: ${error.message}`;
-          thesaurusPanel.appendChild(p);
-        }
-      } else {
-        const p = document.createElement('p');
-        p.textContent = 'Add your Thesaurus API key in Settings to see synonyms and antonyms.';
-        thesaurusPanel.appendChild(p);
-      }
+      const loading=document.createElement('p');
+      loading.textContent=keys.thesaurus ? 'Loading synonyms and antonyms…' : 'Add your Thesaurus API key in Settings to see synonyms and antonyms.';
+      thesaurusPanel.appendChild(loading);
 
       updateLookupAddControls();
       result.classList.remove('hidden');
-      status.textContent = `Lookup complete for ${displayWord}.`;
+      status.textContent = `Dictionary loaded for ${dictionary.headword || raw}.`;
       result.focus();
+      $('lookupButton').disabled = false;
+
+      if (keys.thesaurus) {
+        void (async()=>{
+          try {
+            const thesaurus = await getThesaurus(storedWord);
+            renderThesaurusWithAdd(thesaurusPanel, thesaurus, () => Number($('lookupLevel').value) || 3);
+          } catch (error) {
+            thesaurusPanel.innerHTML='';
+            const p = document.createElement('p');
+            p.textContent = `Thesaurus lookup was unavailable: ${error.message}`;
+            thesaurusPanel.appendChild(p);
+          }
+        })();
+      }
     } catch (error) {
       status.textContent = `Lookup failed: ${error.message}`;
     } finally {
@@ -1117,43 +1256,60 @@
     const questionPool = session?.mode === 'placement'
       ? WORDS.map(word => ({...word, custom:false, collections:[]}))
       : allStudyWords().filter(word => (!getExistingWordState(word.word).suspended && !isInvalidSeed(word.word)) || word.word===item.word);
-    const target = await getDictionary(item.word);
-    let related={synonyms:[],antonyms:[]};
-    if (keys.thesaurus) {
-      try { related=await getThesaurus(item.word); } catch { related={synonyms:[],antonyms:[]}; }
-    }
-    const relatedWords=new Set([item.word, target.headword, ...(related.synonyms||[]), ...(related.antonyms||[])].map(normalizeWordForMatch));
-    const levelPool=shuffle(questionPool.filter(word => word.word!==item.word && Math.abs((word.level||3)-(item.level||3))<=2));
-    const candidates=[];
-    const seenDefinitions=new Set([target.definition.toLowerCase().trim()]);
-    let attempts=0;
-    for (const candidate of levelPool) {
-      if (attempts>=24 || candidates.length>=8) break;
-      attempts += 1;
-      if (relatedWords.has(normalizeWordForMatch(candidate.word))) continue;
-      try {
-        const entry=await getDictionary(candidate.word);
-        if (!entry?.definition) continue;
-        if (normalizeWordForMatch(entry.headword)===normalizeWordForMatch(target.headword)) continue;
-        const normalizedDefinition=entry.definition.toLowerCase().trim();
-        if (seenDefinitions.has(normalizedDefinition)) continue;
-        const similarity=definitionSimilarity(target.definition,entry.definition);
-        if (similarity>0.34) continue;
-        seenDefinitions.add(normalizedDefinition);
-        candidates.push({item:candidate,entry,similarity,score:candidateScore(item,target,candidate,entry,similarity)});
-      } catch (error) {
-        if (isUnusableDictionaryError(error) && CURRICULUM_MAP.has(candidate.word)) markInvalidSeed(candidate.word);
+
+    const sessionWords=[];
+    if (Array.isArray(session?.queue)) {
+      for (const queued of shuffle(session.queue.filter(entry=>entry.word!==item.word))) {
+        if (!sessionWords.some(existing=>existing.word===queued.word)) sessionWords.push(queued);
       }
     }
+    const backupWords=shuffle(questionPool.filter(candidate=>candidate.word!==item.word && !sessionWords.some(existing=>existing.word===candidate.word)));
+    const candidateItems=[...sessionWords,...backupWords].slice(0,7);
+    const batchWords=[item.word,...candidateItems.map(candidate=>candidate.word)];
+    const loaded=await getDictionaryBatch(batchWords);
+    const targetResult=loaded.get(String(item.word).toLowerCase());
+    if (!targetResult?.entry) throw targetResult?.error || new Error(`No usable definition for ${item.word}.`);
+    const target=targetResult.entry;
+
+    const candidates=[];
+    const seenDefinitions=new Set([String(target.definition||'').toLowerCase().trim()]);
+    for (const candidate of candidateItems) {
+      const result=loaded.get(String(candidate.word).toLowerCase());
+      if (!result?.entry) {
+        if (result?.error && isUnusableDictionaryError(result.error) && CURRICULUM_MAP.has(candidate.word)) markInvalidSeed(candidate.word);
+        continue;
+      }
+      const entry=result.entry;
+      if (normalizeWordForMatch(entry.headword)===normalizeWordForMatch(target.headword)) continue;
+      const normalizedDefinition=String(entry.definition||'').toLowerCase().trim();
+      if (!normalizedDefinition || seenDefinitions.has(normalizedDefinition)) continue;
+      const similarity=definitionSimilarity(target.definition,entry.definition);
+      if (similarity>0.32) continue;
+      if (sharedCollectionCount(item,candidate)>=2 && similarity>0.12) continue;
+      seenDefinitions.add(normalizedDefinition);
+      candidates.push({item:candidate,entry,similarity,score:candidateScore(item,target,candidate,entry,similarity)});
+    }
     candidates.sort((a,b)=>b.score-a.score);
-    const chosen=candidates.slice(0,3);
-    if (chosen.length<3) throw new Error('Not enough unambiguous dictionary choices were available for this question.');
-    let direction = session.direction;
-    if (direction === 'mixed') direction = Math.random()<0.35 ? 'word-def' : 'def-word';
+
+    let direction=session.direction;
+    if (direction==='mixed') direction=Math.random()<0.7 ? 'word-def' : 'def-word';
+    if (direction==='word-def' && !target.answerDefinition) direction='def-word';
+
+    let chosen=[];
+    if (direction==='word-def') chosen=candidates.filter(candidate=>candidate.entry.answerDefinition).slice(0,3);
+    else chosen=candidates.slice(0,3);
+    if (chosen.length<3) {
+      if (direction==='word-def') {
+        direction='def-word';
+        chosen=candidates.slice(0,3);
+      }
+      if (chosen.length<3) throw new Error('Not enough clear answer choices were available for this question.');
+    }
+
     const rawOptions = direction === 'word-def'
-      ? [{value:target.definition, correct:true, word:item.word, source:target.source}, ...chosen.map(({item:candidate,entry})=>({value:entry.definition,correct:false,word:candidate.word,source:entry.source}))]
+      ? [{value:target.answerDefinition, correct:true, word:item.word, source:target.source}, ...chosen.map(({item:candidate,entry})=>({value:entry.answerDefinition,correct:false,word:candidate.word,source:entry.source}))]
       : [{value:item.word, correct:true, word:item.word}, ...chosen.map(({item:candidate})=>({value:candidate.word,correct:false,word:candidate.word}))];
-    const options = shuffle(rawOptions).map((option,index)=>({...option, letter:'ABCD'[index]}));
+    const options=shuffle(rawOptions).map((option,index)=>({...option,letter:'ABCD'[index]}));
     return {item,target,distractors:chosen.map(value=>value.entry),direction,options,screened:true};
   }
 
@@ -1197,7 +1353,7 @@
       $('detailsButton').classList.add('hidden');
       $('nextQuestionButton').textContent = 'Skip this word';
       $('nextQuestionButton').onclick = () => { session.index += 1; session.resumeIndex = session.index; persistSession(); presentQuestion(); };
-      panel.focus();
+      requestAnimationFrame(() => $('feedbackHeading').focus());
     }
   }
 
@@ -1231,19 +1387,24 @@
       choices.appendChild(b);
     });
     $('questionPrompt').focus();
+    void prefetchSessionDictionary((session?.index || 0) + 1);
   }
 
   function renderOfficialDefinitions(target) {
     const section=$('officialDefinitions');
     const list=$('officialDefinitionList');
     list.innerHTML='';
-    const definitions=[...new Set((target.shortdefs||[]).filter(Boolean))];
+    const primary=String(target.answerDefinition || target.definition || '').trim();
+    const definitions=[...new Set((target.shortdefs||[]).map(value=>String(value||'').trim()).filter(Boolean))]
+      .filter(definition=>definition!==primary)
+      .slice(0,2);
     for (const definition of definitions) {
       const li=document.createElement('li');
       li.textContent=definition;
       list.appendChild(li);
     }
     section.classList.toggle('hidden',definitions.length===0);
+    if ('open' in section) section.open=false;
   }
 
   function answerQuestion(option, button) {
@@ -1272,11 +1433,11 @@
       const labels=[];
       if (correct) labels.push('correct answer');
       if (selected) labels.push('your answer');
-      if (selected && !correct) labels.push('incorrect');
+      if (selected && !correct) labels.push('not correct');
       answerButton.textContent = `${answerButton.dataset.baseText}${labels.length ? ` — ${labels.join(', ')}` : ''}`;
       answerButton.setAttribute('aria-label', `${answerButton.dataset.baseText}${labels.length ? `. ${labels.join('. ')}.` : ''}`);
       if (correct) answerButton.classList.add('correct-answer');
-      if (selected && !correct) answerButton.classList.add('incorrect-answer');
+      if (selected && !correct) answerButton.classList.add('wrong-answer');
     });
 
     if (!isCorrect && !isPlacement) {
@@ -1290,38 +1451,38 @@
 
     const state = getExistingWordState(q.item.word);
     const panel = $('feedbackPanel');
-    panel.className = `feedback hidden ${isCorrect ? 'correct' : 'incorrect'}`;
-    $('feedbackHeading').textContent = isCorrect ? 'Correct' : 'Incorrect';
+    const primaryDefinition=q.target.answerDefinition || q.target.definition;
+    panel.className = `feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
+    $('feedbackHeading').textContent = isCorrect ? 'Correct' : 'Not quite';
     if (isPlacement) {
       $('feedbackText').textContent = isCorrect
-        ? `${q.item.word}: ${q.target.definition}`
-        : `The correct answer is ${q.direction==='word-def' ? q.target.definition : q.item.word}. Placement answers do not change your mastery record.`;
+        ? `${q.item.word}: ${primaryDefinition}`
+        : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}.`;
     } else {
       $('feedbackText').textContent = isCorrect
-        ? `${q.item.word}: ${q.target.definition}`
-        : `The correct answer is ${q.direction==='word-def' ? q.target.definition : q.item.word}. This word will return later in this session.`;
+        ? `${q.item.word}: ${primaryDefinition}`
+        : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}. This word will return later.`;
     }
     $('wordFacts').innerHTML = '';
-    addFact('Word', q.target.headword || q.item.word);
     if (q.target.partOfSpeech) addFact('Part of speech', q.target.partOfSpeech);
-    addFact('Definition source', "Merriam-Webster's Collegiate Dictionary");
+    addFact('Source', "Merriam-Webster Collegiate Dictionary");
     renderOfficialDefinitions(q.target);
     if (isPlacement) {
-      addFact('Placement', 'Does not affect mastery or study statistics');
+      addFact('Placement', 'Does not change study progress');
       $('detailsButton').classList.add('hidden');
     } else {
       addFact('Mastery', statusOf(state));
-      addFact('Record', `${state.correct} correct, ${state.wrong} incorrect`);
       $('detailsButton').classList.remove('hidden');
       $('luckyGuessButton').classList.toggle('hidden', !isCorrect);
-      $('detailsButton').textContent = 'Show synonyms and antonyms';
+      $('detailsButton').textContent = 'Synonyms and antonyms';
       $('detailsButton').disabled = false;
     }
-    $('nextQuestionButton').textContent = 'Next question';
+    $('nextQuestionButton').textContent = 'Next word';
     $('nextQuestionButton').onclick = nextQuestion;
     updateQuestionCounter();
     session.resumeIndex = session.index + 1;
     persistSession();
+    $('questionCard').classList.add('hidden');
     panel.classList.remove('hidden');
     requestAnimationFrame(() => $('feedbackHeading').focus());
     if (!isPlacement) renderHome();
@@ -1690,6 +1851,7 @@
     $('resumeSessionButton').addEventListener('click',resumeSavedSession);
     $('startPracticeButton').addEventListener('click',()=>beginQuickSession('quick'));
     $('homeDiscoverButton').addEventListener('click',()=>beginQuickSession('discover'));
+    qsa('[data-home-level]').forEach(button=>button.addEventListener('click',()=>beginLevelSession(Number(button.dataset.homeLevel))));
     $('homeCustomButton').addEventListener('click',()=>{ switchView('practice'); renderPracticeSetup(); });
     $('homePlacementButton').addEventListener('click',()=>{switchView('practice'); beginSession('placement');});
     $('homePersonalButton').addEventListener('click',()=>{ settings={...settings,source:'personal',collection:'all',levels:[1,2,3,4,5]}; saveState(); switchView('practice'); });
@@ -1758,7 +1920,7 @@
     updateInstallUI();
     if (!keys.dictionary || !keys.thesaurus) $('setupNotice').textContent='Before your first practice session, open Settings and enter your two Merriam-Webster API keys.';
     if (settings.lastVersion !== APP_VERSION) {
-      $('versionNotice').textContent = `Updated to v0.7: corrected TalkBack feedback, safer Merriam-Webster distractors, broad 5,000-word Quick Play, Discover mode, official-definition review, and a simpler study dashboard.`;
+      $('versionNotice').textContent = `Updated to v0.8: faster batched rounds, concise answer meanings, a Vocabulary Builder-style study layout, quieter TalkBack results, and broader new-word rotation across the 5,000-word curriculum.`;
       $('versionNotice').classList.remove('hidden');
       settings = {...settings, lastVersion:APP_VERSION};
       saveState();
