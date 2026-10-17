@@ -1,0 +1,12 @@
+{
+  "name": "accessible-vocabulary-builder",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Accessible personal vocabulary builder using Merriam-Webster APIs.",
+  "scripts": {
+    "start": "node dev-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

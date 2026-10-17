@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#4b1f69">
+  <meta name="description" content="Accessible vocabulary practice with a broad 5,000-word curriculum, screened Merriam-Webster questions, collections, history, and persistent progress tracking.">
+  <title>Vocabulary Builder</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="icon-192.png">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="app-header" aria-label="App bar">
+    <button id="backButton" class="app-bar-button hidden" type="button" aria-label="Back">Back</button>
+    <h1 id="appBarTitle">Vocabulary Builder</h1>
+    <div class="header-actions">
+      <button id="endSessionButton" class="app-bar-button hidden" type="button">End round</button>
+      <button id="menuButton" class="app-bar-button" type="button" aria-expanded="false" aria-controls="mainMenu">Menu</button>
+      <button id="installButton" class="app-bar-button hidden" type="button">Install app</button>
+    </div>
+  </header>
+
+  <nav id="mainMenu" aria-label="Main navigation" class="main-menu hidden">
+    <button type="button" data-view="home" aria-current="page">Home</button>
+    <button type="button" data-view="lookup">Dictionary</button>
+    <button id="menuSavedWordsButton" type="button">Saved words</button>
+    <button type="button" data-view="collections">Collections</button>
+    <button type="button" data-view="words">Vocabulary library</button>
+    <button type="button" data-view="history">Word history</button>
+    <button type="button" data-view="stats">Progress</button>
+    <button type="button" data-view="settings">Settings</button>
+    <button type="button" data-view="about">About</button>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <section id="view-home" class="view builder-home" aria-labelledby="homeHeading">
+      <h2 id="homeHeading" class="sr-only" tabindex="-1">Home</h2>
+      <section id="setupNotice" class="notice compact-notice hidden" aria-labelledby="setupNoticeText">
+        <p id="setupNoticeText">Dictionary setup is needed before practice.</p>
+        <button id="setupButton" type="button">Set up dictionary</button>
+      </section>
+
+      <section class="home-hero" aria-labelledby="homeStudyHeading">
+        <h3 id="homeStudyHeading">Practice</h3>
+        <div class="home-practice-grid">
+          <button id="resumeSessionButton" class="home-action primary-action hidden" type="button"><span class="action-title">Resume</span><span class="action-subtitle">Continue your unfinished round</span></button>
+          <button id="startPracticeButton" class="home-action primary-action" type="button"><span class="action-title">Mixed practice</span><span class="action-subtitle">Review plus useful new words</span></button>
+          <button id="homeDiscoverButton" class="home-action" type="button"><span class="action-title">New words</span><span class="action-subtitle">A round of unseen vocabulary</span></button>
+        </div>
+      </section>
+
+      <section class="builder-panel" aria-labelledby="homeLevelsHeading">
+        <h3 id="homeLevelsHeading">Levels</h3>
+        <div class="level-stack">
+          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Common</span><span id="homeLevel1Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="2"><span class="level-title">Level 2 · Intermediate</span><span id="homeLevel2Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel2Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="3"><span class="level-title">Level 3 · Advanced</span><span id="homeLevel3Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel3Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="4"><span class="level-title">Level 4 · Expert</span><span id="homeLevel4Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel4Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="5"><span class="level-title">Level 5 · Challenge</span><span id="homeLevel5Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel5Bar" class="level-fill"></span></span></button>
+        </div>
+      </section>
+
+      <section id="homeReviewPanel" class="builder-panel hidden" aria-labelledby="homeReviewHeading">
+        <h3 id="homeReviewHeading">Review</h3>
+        <div class="home-review-grid">
+          <button id="reviewDueButton" class="hidden" type="button">Due reviews: 0</button>
+          <button id="reviewMissedButton" class="hidden" type="button">Difficult words: 0</button>
+        </div>
+      </section>
+
+      <section class="builder-panel" aria-labelledby="homeExploreHeading">
+        <h3 id="homeExploreHeading">Explore</h3>
+        <div class="home-explore-grid">
+          <button id="homeLookupButton" type="button">Dictionary</button>
+          <button id="homeSavedWordsButton" type="button">Saved words</button>
+          <button id="homeCollectionsButton" type="button">Collections</button>
+          <button id="homeCustomButton" type="button">Custom practice</button>
+        </div>
+      </section>
+
+      <section class="progress-preview" aria-labelledby="homeProgressHeading">
+        <div>
+          <h3 id="homeProgressHeading">Your progress</h3>
+          <p id="homeProgressSummary">No study activity yet.</p>
+        </div>
+        <button id="homeProgressButton" type="button">View progress</button>
+      </section>
+    </section>
+
+    <section id="view-practice" class="view hidden" aria-labelledby="practiceHeading">
+      <h2 id="practiceHeading" class="sr-only" tabindex="-1">Custom practice</h2>
+
+      <div id="practiceSetup">
+        <fieldset>
+          <legend>Difficulty levels</legend>
+          <label><input type="checkbox" name="level" value="1" checked> Level 1: Common</label>
+          <label><input type="checkbox" name="level" value="2" checked> Level 2: Intermediate</label>
+          <label><input type="checkbox" name="level" value="3" checked> Level 3: Advanced</label>
+          <label><input type="checkbox" name="level" value="4" checked> Level 4: Expert</label>
+          <label><input type="checkbox" name="level" value="5" checked> Level 5: Challenge</label>
+        </fieldset>
+        <label for="practiceSource">Study source</label>
+        <select id="practiceSource">
+          <option value="all" selected>All study words</option>
+          <option value="personal">Saved words only</option>
+          <option value="starter">Curriculum words only</option>
+        </select>
+        <label for="practiceCollection">Topic collection</label>
+        <select id="practiceCollection">
+          <option value="all" selected>All topics</option>
+        </select>
+        <label for="newWordMix">New-word mix</label>
+        <select id="newWordMix">
+          <option value="low">Low — mostly review</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="high">High — more unseen words</option>
+        </select>
+        <label for="sessionSize">Questions per round</label>
+        <select id="sessionSize">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+        </select>
+        <label for="questionDirection">Question style</label>
+        <select id="questionDirection">
+          <option value="word-def" selected>Word to meaning — Vocabulary Builder style</option>
+          <option value="def-word">Definition to word</option>
+          <option value="mixed">Mixed</option>
+        </select>
+        <button id="beginSessionButton" class="primary large" type="button">Start round</button>
+        <details class="secondary-options">
+          <summary>More options</summary>
+          <button id="placementButton" type="button">Run placement check</button>
+          <p class="help-text">Placement estimates a starting level without changing mastery or statistics.</p>
+        </details>
+      </div>
+
+      <div id="quizArea" class="hidden">
+        <p id="questionCounter" class="counter"></p>
+        <div id="loadingQuestion" class="notice hidden" role="status">Loading official dictionary entries…</div>
+        <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
+          <p id="questionType" class="eyebrow"></p>
+          <p id="questionContext" class="question-context"></p>
+          <h3 id="questionPrompt" tabindex="-1"></h3>
+          <div id="answerChoices" class="answers" role="group" aria-label="Answer choices"></div>
+        </article>
+
+        <section id="feedbackPanel" class="feedback hidden" role="region" aria-labelledby="feedbackHeading">
+          <h3 id="feedbackHeading" tabindex="-1"></h3>
+          <p id="feedbackText"></p>
+          <div class="feedback-actions">
+            <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
+            <button id="nextQuestionButton" class="primary" type="button">Next word</button>
+            <button id="feedbackSaveButton" type="button">Save word</button>
+            <button id="feedbackOpenWordButton" type="button">Word details</button>
+          </div>
+          <p id="confidenceStatus" class="help-text hidden" role="status"></p>
+          <details id="feedbackMore" class="feedback-more">
+            <summary>More about this word</summary>
+            <dl id="wordFacts" class="facts"></dl>
+            <details id="officialDefinitions" class="official-definitions hidden">
+              <summary id="officialDefinitionsHeading">More Merriam-Webster definitions</summary>
+              <ol id="officialDefinitionList"></ol>
+            </details>
+            <button id="detailsButton" type="button">Related words</button>
+            <div id="detailsPanel" class="details hidden" aria-live="polite"></div>
+          </details>
+        </section>
+      </div>
+
+      <section id="sessionComplete" class="hidden" tabindex="-1" aria-labelledby="completeHeading">
+        <h3 id="completeHeading">Round complete</h3>
+        <p id="sessionSummary"></p>
+        <div class="action-stack compact">
+          <button id="placementApplyButton" class="primary hidden" type="button">Practice at recommended level</button>
+          <button id="anotherSessionButton" class="primary" type="button">Continue</button>
+          <button id="reviewRoundButton" class="hidden" type="button">Review missed words</button>
+          <button id="sessionHomeButton" type="button">Home</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="view-lookup" class="view hidden" aria-labelledby="lookupHeading">
+      <h2 id="lookupHeading" class="sr-only" tabindex="-1">Dictionary</h2>
+      <p class="screen-intro">Look up a word, then save or practice it if useful.</p>
+
+      <form id="lookupForm" class="lookup-form">
+        <label for="lookupWord">Word</label>
+        <input id="lookupWord" type="search" autocomplete="off" autocapitalize="none" spellcheck="true">
+        <button id="lookupButton" class="primary" type="submit">Look up word</button>
+      </form>
+      <p id="lookupStatus" role="status" aria-live="polite"></p>
+
+      <section id="recentLookups" class="recent-lookups hidden" aria-labelledby="recentLookupsHeading">
+        <div class="row-between">
+          <h3 id="recentLookupsHeading">Recent lookups</h3>
+          <button id="clearRecentLookupsButton" class="secondary" type="button">Clear recent lookups</button>
+        </div>
+        <div id="recentLookupButtons" class="chip-list"></div>
+      </section>
+
+      <section id="lookupSuggestions" class="lookup-suggestions hidden" aria-labelledby="lookupSuggestionsHeading">
+        <h3 id="lookupSuggestionsHeading">Suggested spellings</h3>
+        <ul id="lookupSuggestionList"></ul>
+      </section>
+    </section>
+
+    <section id="view-word" class="view hidden word-view" aria-labelledby="wordDetailWord">
+      <article class="word-detail-card">
+        <p id="wordDetailLoading" class="word-loading" role="status" tabindex="-1"></p>
+        <div id="wordDetailContent" class="hidden">
+          <p id="wordDetailStatus" class="status-pill"></p>
+          <h2 id="wordDetailWord" tabindex="-1"></h2>
+          <p id="wordDetailPartOfSpeech" class="word-part"></p>
+          <p id="wordDetailMeaning" class="word-meaning"></p>
+          <p id="wordDetailRecord" class="word-record"></p>
+
+          <div class="word-primary-actions">
+            <button id="wordSaveButton" class="primary" type="button">Save word</button>
+            <button id="wordPracticeButton" type="button">Practice word</button>
+          </div>
+
+          <details id="wordDefinitionsDetails" class="word-disclosure hidden">
+            <summary>More definitions</summary>
+            <ol id="wordDefinitionList"></ol>
+          </details>
+
+          <section class="word-section" aria-labelledby="wordRelatedHeading">
+            <div class="row-between">
+              <h3 id="wordRelatedHeading">Synonyms and antonyms</h3>
+              <button id="wordRelatedButton" type="button">Show synonyms and antonyms</button>
+            </div>
+            <div id="wordRelatedPanel" class="hidden"></div>
+          </section>
+
+          <details class="word-disclosure" id="wordLearningDetails">
+            <summary>Learning options</summary>
+            <div class="word-secondary-actions">
+              <button id="wordKnownButton" type="button">Mark as known</button>
+              <button id="wordSuspendButton" type="button">Pause review</button>
+            </div>
+            <div id="wordLevelControl" class="hidden">
+              <label for="wordLevelSelect">Study level</label>
+              <select id="wordLevelSelect">
+                <option value="1">Level 1: Common</option>
+                <option value="2">Level 2: Intermediate</option>
+                <option value="3">Level 3: Advanced</option>
+                <option value="4">Level 4: Expert</option>
+                <option value="5">Level 5: Challenge</option>
+              </select>
+            </div>
+            <p id="wordCollections" class="help-text"></p>
+          </details>
+        </div>
+      </article>
+    </section>
+
+    <section id="view-words" class="view hidden" aria-labelledby="wordsHeading">
+      <h2 id="wordsHeading" class="sr-only" tabindex="-1">Vocabulary library</h2>
+      <div class="library-search">
+        <label for="wordSearch">Search words</label>
+        <input id="wordSearch" type="search" autocomplete="off">
+      </div>
+      <details class="filters">
+        <summary>Filters</summary>
+        <label for="sourceFilter">Word source</label>
+        <select id="sourceFilter">
+          <option value="all">All words</option>
+          <option value="personal">Saved words</option>
+          <option value="starter">Curriculum words</option>
+        </select>
+        <label for="collectionFilter">Topic collection</label>
+        <select id="collectionFilter">
+          <option value="all">All collections</option>
+        </select>
+        <label for="availabilityFilter">Availability</label>
+        <select id="availabilityFilter">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+        </select>
+        <label for="statusFilter">Mastery status</label>
+        <select id="statusFilter">
+          <option value="all">All</option>
+          <option value="New">New</option>
+          <option value="in-progress">In progress</option>
+          <option value="Learning">Learning</option>
+          <option value="Familiar">Familiar</option>
+          <option value="Strong">Strong</option>
+          <option value="Mastered">Mastered</option>
+        </select>
+        <label for="levelFilter">Difficulty</label>
+        <select id="levelFilter">
+          <option value="all">All levels</option>
+          <option value="1">Level 1</option>
+          <option value="2">Level 2</option>
+          <option value="3">Level 3</option>
+          <option value="4">Level 4</option>
+          <option value="5">Level 5</option>
+        </select>
+      </details>
+      <button id="libraryPracticeButton" class="primary hidden" type="button">Practice saved words</button>
+      <p id="wordListSummary" role="status" tabindex="-1"></p>
+      <ul id="wordList" class="word-list"></ul>
+      <div id="wordPagination" class="pagination-controls">
+        <button id="wordPrevButton" type="button">Previous 25 words</button>
+        <span id="wordPageStatus" role="status"></span>
+        <button id="wordNextButton" type="button">Next 25 words</button>
+      </div>
+    </section>
+
+    <section id="view-collections" class="view hidden" aria-labelledby="collectionsHeading">
+      <h2 id="collectionsHeading" class="sr-only" tabindex="-1">Collections</h2>
+      <p class="screen-intro">Browse or practice related words by topic.</p>
+      <div id="collectionList" class="collection-list"></div>
+    </section>
+
+    <section id="view-history" class="view hidden" aria-labelledby="historyHeading">
+      <h2 id="historyHeading" class="sr-only" tabindex="-1">Word history</h2>
+      <p class="screen-intro">Recently encountered words, newest first.</p>
+      <p id="historySummary" role="status" tabindex="-1"></p>
+      <ul id="historyList" class="word-list"></ul>
+      <button id="historyMoreButton" type="button">Show 25 more words</button>
+    </section>
+
+    <section id="view-stats" class="view hidden" aria-labelledby="statsHeading">
+      <h2 id="statsHeading" class="sr-only" tabindex="-1">Progress</h2>
+      <ul id="overallStats" class="stats-list"></ul>
+      <h3>By difficulty level</h3>
+      <div id="levelStats"></div>
+    </section>
+
+    <section id="view-settings" class="view hidden" aria-labelledby="settingsHeading">
+      <h2 id="settingsHeading" class="sr-only" tabindex="-1">Settings</h2>
+
+      <section class="builder-panel" aria-labelledby="appearanceHeading">
+        <h3 id="appearanceHeading">Appearance</h3>
+        <label for="appearanceMode">Theme</label>
+        <select id="appearanceMode">
+          <option value="system">Follow system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </section>
+
+      <details id="referenceSettings" class="settings-disclosure">
+        <summary>Dictionary connection</summary>
+        <p class="help-text">Your Merriam-Webster API keys stay in this browser's local storage and are sent only through the app's same-origin lookup proxy.</p>
+        <div class="settings-form">
+          <label for="dictionaryKey">Dictionary API key</label>
+          <input id="dictionaryKey" type="password" autocomplete="off" spellcheck="false">
+          <label for="thesaurusKey">Thesaurus API key</label>
+          <input id="thesaurusKey" type="password" autocomplete="off" spellcheck="false">
+          <label class="inline"><input id="showKeys" type="checkbox"> Show API keys</label>
+          <div class="action-row">
+            <button id="saveKeysButton" class="primary" type="button">Save keys</button>
+            <button id="testKeysButton" type="button">Check connection</button>
+          </div>
+          <p id="keyStatus" role="status"></p>
+          <p><a href="https://dictionaryapi.com/" target="_blank" rel="noopener">Merriam-Webster API Developer Center</a></p>
+        </div>
+      </details>
+
+      <details class="settings-disclosure">
+        <summary>Backup and reset</summary>
+        <p>Backups contain study progress and settings, but never your API keys.</p>
+        <div class="action-stack compact">
+          <button id="exportProgressButton" type="button">Export progress backup</button>
+          <label for="importProgressInput" class="file-label">Import progress backup</label>
+          <input id="importProgressInput" type="file" accept="application/json,.json">
+          <button id="resetProgressButton" class="danger" type="button">Reset study progress</button>
+        </div>
+      </details>
+    </section>
+
+    <section id="view-about" class="view hidden" aria-labelledby="aboutHeading">
+      <h2 id="aboutHeading" class="sr-only" tabindex="-1">About</h2>
+      <section class="builder-panel">
+        <h3>Vocabulary Builder</h3>
+        <p><strong>Version 0.9</strong></p>
+        <p>Accessibility-first vocabulary practice with a 5,000-word curriculum and live Merriam-Webster reference data.</p>
+      </section>
+      <section class="builder-panel">
+        <h3>Navigation</h3>
+        <p>Android Back returns to the previous app screen. During a round, leaving Practice keeps the unfinished round available from Home.</p>
+      </section>
+      <section class="builder-panel">
+        <h3>Data and reference content</h3>
+        <p>Progress and API keys remain in this browser's local storage. Definitions come from Merriam-Webster when needed; the built-in curriculum stores headwords and study metadata, not a copied dictionary.</p>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="curriculum.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
