@@ -488,3 +488,14 @@ body { min-height: 100vh; }
 .feedback-actions #nextQuestionButton { width: 100%; font-size: 1.12rem; }
 .sound-setting { min-height: 54px; cursor: pointer; }
 .sound-setting input { accent-color: var(--accent); }
+
+
+/* v1.6: compact disclosure for genuinely different meanings, outside action area. */
+.feedback-other-meanings { border: 1px solid var(--border); border-radius: .6rem; margin-top: .75rem; }
+.feedback-other-meanings summary { min-height: 52px; padding: .75rem .85rem; cursor: pointer; font-weight: 750; line-height: 1.35; }
+.feedback-other-meanings summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.feedback-other-meanings[open] summary { border-bottom: 1px solid var(--border); }
+.feedback-other-meanings ol { margin: .65rem .9rem .85rem 1.75rem; padding: 0; }
+.feedback-other-meanings li { padding: .3rem 0 .6rem; }
+.other-meaning-definition { margin: 0 0 .35rem; font-weight: 650; }
+.other-meaning-example { margin: .3rem 0 0; line-height: 1.5; }

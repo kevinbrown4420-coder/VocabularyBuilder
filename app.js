@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.5';
+  const APP_VERSION = '1.6';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -1104,11 +1104,11 @@
   function examplesForTeachingSense(entry, definition) {
     const senses=senseIllustrations(entry);
     const target=String(definition || '');
-    let chosen=senses[0] || null;
+    let chosen=null;
     let score=0;
     for (const sense of senses) {
       const similarity=definitionSimilarity(target,sense.definition);
-      if (similarity>score && similarity>=0.40) {
+      if (similarity>score && similarity>=0.50) {
         chosen=sense;
         score=similarity;
       }
@@ -1118,7 +1118,7 @@
     const supplemental=Array.isArray(entry?.suppl?.examples) ? entry.suppl.examples.map(item=>cleanMwText(item?.t)).filter(Boolean) : [];
     // Supplemental examples are not sense-linked. Use only when the entry has
     // one dictionary sense, or no sense-linked examples exist in the entry.
-    const canUseSupplemental=senses.length<=1 || senses.every(sense=>!sense.examples.length);
+    const canUseSupplemental=Boolean(chosen) && (senses.length<=1 || senses.every(sense=>!sense.examples.length));
     const candidates=direct.length ? direct : (canUseSupplemental ? supplemental : []);
     const uniqueExamples=[...new Set(candidates.map(value=>String(value).trim()).filter(Boolean))];
     // Prefer a full sentence when Merriam-Webster supplied one, while retaining
@@ -1632,15 +1632,804 @@
     "truculent": "The truculent customer threatened staff over a minor delay.",
     "verisimilitude": "The historical details gave the novel a strong sense of verisimilitude.",
     "vociferous": "A vociferous group of residents protested the proposed road.",
-    "winsome": "Her winsome smile helped put the nervous guests at ease."
+    "winsome": "Her winsome smile helped put the nervous guests at ease.",
+    "distribution": "The relief agency coordinated the distribution of water to the flooded neighborhoods.",
+    "conclusion": "After reviewing the invoices, the auditor reached a different conclusion.",
+    "attain": "She worked for years to attain the certification required for the position.",
+    "contrast": "The report contrasts last year's spending with this year's projected costs.",
+    "maintain": "The technician will maintain the equipment to prevent unexpected breakdowns.",
+    "difference": "A small difference in interest rates can change the total cost of a loan.",
+    "obtain": "You must obtain written permission before entering the property.",
+    "affect": "The road closure will affect deliveries throughout the neighborhood.",
+    "capacity": "The auditorium has a seating capacity of six hundred.",
+    "proposal": "The committee approved a proposal to extend library hours.",
+    "frame": "He tried to frame the disagreement as a problem they could solve together.",
+    "singular": "Her singular achievement was developing a vaccine under difficult conditions.",
+    "diplomacy": "Years of diplomacy helped the neighboring countries settle their border dispute.",
+    "preserve": "The museum uses special lighting to preserve the fragile manuscripts.",
+    "criticism": "The director listened carefully to criticism of the new policy.",
+    "distinguish": "The witness could not distinguish the two vehicles in the darkness.",
+    "exception": "Everyone must wear a badge, with no exception for temporary staff.",
+    "judgment": "The manager used sound judgment when deciding whether to postpone the launch.",
+    "recognition": "Her volunteer work earned recognition from the city council.",
+    "appropriate": "A quiet conversation would be more appropriate than a public accusation.",
+    "argument": "His argument rested on evidence collected from three independent studies.",
+    "concern": "The inspector expressed concern about cracks in the foundation.",
+    "interval": "The buses arrive at fifteen-minute intervals during rush hour.",
+    "passive": "She remained passive during the discussion and offered no suggestions.",
+    "responsible": "The contractor is responsible for repairing any damage caused during installation.",
+    "assumption": "Their budget relied on the assumption that fuel prices would remain stable.",
+    "challenge": "Learning to navigate the unfamiliar building was a demanding challenge.",
+    "conceal": "The seller tried to conceal water damage behind a fresh coat of paint.",
+    "indicate": "The flashing light will indicate when the battery needs charging.",
+    "retain": "Please retain a copy of the receipt for your records.",
+    "suitable": "The narrow staircase was not suitable for moving the heavy refrigerator.",
+    "dependent": "The project's success is dependent on the permit arriving by Friday.",
+    "draft": "The attorney prepared a draft of the agreement for review.",
+    "hostile": "The conversation became hostile after several personal accusations.",
+    "regulation": "A new safety regulation requires handrails on both sides of the stairway.",
+    "uncertain": "The surveyor was uncertain where the original property line ended.",
+    "compare": "We compared three insurance quotes before choosing a policy.",
+    "consist": "The committee will consist of five employees from different departments.",
+    "ownership": "The deed confirms ownership of the property.",
+    "reasonable": "The mechanic offered a reasonable estimate for the repairs.",
+    "consequence": "One consequence of missing the deadline was a late fee.",
+    "boundary": "A wooden fence marked the boundary between the two yards.",
+    "description": "The online description omitted the basement's water damage.",
+    "effective": "The new reminder system proved effective at reducing missed appointments.",
+    "experiment": "The students designed an experiment to measure how temperature affects growth.",
+    "probable": "Rain is probable tomorrow, according to the latest forecast.",
+    "decline": "Sales began to decline after the store reduced its hours.",
+    "exact": "The contractor asked for the exact dimensions of the opening.",
+    "irony": "There was irony in the fire station losing power during a safety inspection.",
+    "outline": "She wrote an outline before drafting the full report.",
+    "finance": "They decided to finance the purchase rather than pay the entire cost upfront.",
+    "narrative": "The witness gave a detailed narrative of the events leading up to the collision.",
+    "remedy": "Replacing the faulty valve was the simplest remedy for the leak.",
+    "signal": "She raised her hand to signal that she needed assistance.",
+    "assure": "The supervisor tried to assure the staff that the schedule would not change.",
+    "correspondence": "The investigator reviewed correspondence between the supplier and the agency.",
+    "subtle": "A subtle change in his tone suggested that he was becoming impatient.",
+    "framework": "The team adopted a framework for evaluating risks consistently.",
+    "hostility": "Open hostility between the neighbors made negotiation difficult.",
+    "respectful": "Even when they disagreed, their discussion remained respectful.",
+    "tense": "The atmosphere grew tense as the jury returned to the courtroom.",
+    "efficient": "The redesigned process is more efficient because it eliminates duplicate entries.",
+    "examine": "The physician will examine the injury before recommending treatment.",
+    "sincere": "Her sincere apology acknowledged the harm without making excuses.",
+    "logical": "It is logical to inspect the roof before replacing the damaged ceiling.",
+    "contradiction": "There was a clear contradiction between his written statement and his testimony.",
+    "persist": "If the symptoms persist, the doctor recommended another appointment.",
+    "reliable": "The old truck was reliable despite its high mileage.",
+    "distinction": "The contract makes a distinction between routine maintenance and emergency repairs.",
+    "inquire": "She called the office to inquire about the application deadline.",
+    "limitation": "A major limitation of the study was its small sample size.",
+    "poetic": "The novel's poetic language gives ordinary scenes an unusual beauty.",
+    "protest": "Residents gathered to protest the proposed demolition.",
+    "threshold": "The grant is available only to households below the income threshold.",
+    "acquire": "The company plans to acquire a smaller competitor next year.",
+    "adopt": "The board voted to adopt a revised code of conduct.",
+    "expectation": "There was an expectation that all employees would arrive on time.",
+    "revision": "The second revision corrected several mistakes in the original plan.",
+    "compliance": "The building failed its inspection because it was not in compliance with fire codes.",
+    "motive": "Investigators searched for a motive behind the unusual transaction.",
+    "parallel": "Two parallel investigations examined the same incident from different angles.",
+    "reflect": "The final report should reflect the feedback received from residents.",
+    "uncertainty": "Uncertainty about the closing date made planning the move difficult.",
+    "accomplish": "The volunteers accomplished more in one weekend than expected.",
+    "accurate": "The scale must be accurate to the nearest gram.",
+    "confirm": "Please confirm your appointment by replying to the email.",
+    "fragment": "A fragment of broken glass was found near the doorway.",
+    "justification": "The agency requested a written justification for the unusual expense.",
+    "proposition": "The lecturer challenged the proposition that higher prices always mean better quality.",
+    "variable": "The researchers changed only one variable at a time.",
+    "continual": "The continual ringing of the phone interrupted the meeting.",
+    "equivalent": "The two qualifications are considered equivalent by the licensing board.",
+    "sustain": "The nonprofit needs steady donations to sustain its services.",
+    "warrant": "The evidence did not warrant such a severe disciplinary action.",
+    "acquisition": "The company's acquisition of a regional supplier reduced delivery times.",
+    "alternative": "Taking the train offered an alternative to driving through traffic.",
+    "deduce": "From the muddy footprints, the detective deduced that someone entered through the back door.",
+    "ensure": "Double-check the address to ensure the package reaches the right person.",
+    "exclude": "The estimate excludes the cost of replacing the damaged flooring.",
+    "persuade": "She used inspection photographs to persuade the seller to make repairs.",
+    "precision": "The machinist measured the part with enough precision to fit the narrow slot.",
+    "resolve": "A brief meeting helped resolve the misunderstanding.",
+    "bargain": "They managed to bargain for a lower price on the used equipment.",
+    "certainty": "No one could say with certainty when the bridge would reopen.",
+    "contradict": "The laboratory results contradict the witness's claim.",
+    "deceive": "The advertisement was designed to deceive buyers about the product's age.",
+    "define": "The agreement must define who is responsible for each expense.",
+    "estimate": "The plumber gave an estimate before beginning the work.",
+    "guidance": "New employees received guidance on handling sensitive records.",
+    "indirect": "Her indirect response avoided answering the question plainly.",
+    "intent": "The memo explained the intent behind the new policy.",
+    "model": "The scientists built a model to predict how the storm would move.",
+    "obscure": "A dense patch of fog began to obscure the road signs.",
+    "output": "The factory increased its weekly output without hiring additional workers.",
+    "perception": "His perception of the meeting differed sharply from his colleagues' accounts.",
+    "precise": "The instructions specify a precise amount of medicine.",
+    "presume": "We should not presume the room is empty merely because the lights are off.",
+    "sequence": "Follow the steps in the correct sequence to install the software.",
+    "transition": "The transition to a new payment system took several weeks.",
+    "antecedent": "In the sentence, the pronoun 'she' refers to its antecedent, Maria.",
+    "apologize": "He called to apologize for arriving late.",
+    "apology": "Her apology included a promise to correct the mistake.",
+    "imply": "The warning seems to imply that the bridge is unsafe in heavy rain.",
+    "probability": "The forecast gives a high probability of thunderstorms after noon.",
+    "logic": "The engineer explained the logic behind the unusual design.",
+    "qualification": "The position requires a specific technical qualification.",
+    "vivid": "He gave a vivid description of the sunset over the mountains.",
+    "preference": "She expressed a preference for written instructions over phone calls.",
+    "valid": "The parking permit remains valid until the end of the month.",
+    "constraint": "A strict budget constraint forced the team to simplify its plans.",
+    "hypothesis": "Her hypothesis was that plants grow faster under blue light.",
+    "verse": "The poet read the final verse aloud to the audience.",
+    "achieve": "The team worked together to achieve its yearly goal.",
+    "register": "You must register before attending the training session.",
+    "scope": "The project's scope includes electrical repairs but not landscaping.",
+    "analogy": "The instructor used an analogy between a household budget and a company's cash flow.",
+    "assertion": "The witness's assertion was not supported by any documents.",
+    "forecast": "The latest forecast predicts colder temperatures next week.",
+    "prose": "The author chose straightforward prose rather than elaborate poetic language.",
+    "variance": "The analyst investigated the variance between projected and actual spending.",
+    "approximate": "The architect gave an approximate cost before the final drawings were complete.",
+    "brace": "Workers installed a steel brace to support the damaged beam.",
+    "canon": "The professor explained why the novel is considered part of the literary canon.",
+    "coherence": "The essay lacked coherence because its paragraphs changed topics abruptly.",
+    "explicit": "The lease contains an explicit prohibition against smoking indoors.",
+    "maxim": "Her favorite maxim was to measure twice and cut once.",
+    "objective": "The committee's objective was to reduce processing delays.",
+    "statute": "A state statute determines how much notice landlords must provide.",
+    "subjective": "Judging whether a painting is beautiful is largely subjective.",
+    "validity": "Researchers questioned the validity of conclusions based on incomplete data.",
+    "dependency": "The software upgrade has a dependency on a newer operating system.",
+    "infer": "From the lights and voices inside, they inferred that the house was occupied.",
+    "perspective": "Traveling abroad gave her a different perspective on everyday customs.",
+    "persuasion": "His gentle persuasion convinced the family to reconsider.",
+    "relevant": "Only evidence relevant to the dispute was admitted.",
+    "requirement": "A background check is a requirement for the position.",
+    "solicitation": "The agency published a solicitation inviting companies to submit bids.",
+    "accountability": "Clear accountability helps ensure that mistakes are corrected.",
+    "ambiguity": "The ambiguity of the instruction caused two teams to interpret it differently.",
+    "clarify": "The manager asked her to clarify which deadline applied.",
+    "competence": "His competence as a mechanic became obvious when he diagnosed the problem quickly.",
+    "correlation": "The study found a correlation between sleep duration and concentration.",
+    "criterion": "Price was only one criterion used to evaluate the proposals.",
+    "essay": "She wrote an essay comparing two interpretations of the novel.",
+    "implicit": "The request carried an implicit expectation of confidentiality.",
+    "inference": "Her inference was reasonable, but it still needed confirmation.",
+    "lucid": "The teacher gave a lucid explanation of a difficult mathematical concept.",
+    "priority": "Repairing the broken stair was the highest priority.",
+    "rhyme": "The poet ended each pair of lines with a rhyme.",
+    "similarity": "The two paintings share a striking similarity in color and composition.",
+    "slash": "A slash separates the two alternatives in the printed instructions.",
+    "allocation": "The budget allocation for repairs increased after the inspection.",
+    "articulate": "She could articulate her concerns without raising her voice.",
+    "assess": "The inspector returned to assess the damage after the storm.",
+    "capability": "The new software gives the team the capability to process more records.",
+    "collaboration": "Collaboration between the engineers and designers prevented costly mistakes.",
+    "consensus": "After hours of debate, the committee finally reached a consensus.",
+    "evaluate": "The manager will evaluate each proposal against the same criteria.",
+    "incentive": "The store offered a discount as an incentive for customers to sign up.",
+    "metaphor": "Calling time a thief is a metaphor for how quickly life passes.",
+    "motif": "The repeated image of a locked door became a central motif in the novel.",
+    "optional": "The workshop is optional for employees who already completed the training.",
+    "paraphrase": "She was asked to paraphrase the paragraph in her own words.",
+    "premise": "The argument begins with the premise that every person deserves equal treatment.",
+    "quantitative": "The study used quantitative measurements such as weight and temperature.",
+    "reliability": "The technicians tested the reliability of the backup generator.",
+    "tactic": "Changing the subject was a tactic to avoid the difficult question.",
+    "baseline": "The first measurement established a baseline for future comparisons.",
+    "benchmark": "The team used last year's performance as a benchmark.",
+    "causation": "A correlation alone does not establish causation.",
+    "citation": "The student added a citation identifying the source of the quotation.",
+    "connotation": "The word 'slim' has a more positive connotation than 'skinny' in some contexts.",
+    "coordination": "Careful coordination kept the three construction crews from blocking one another.",
+    "criteria": "The review panel published the criteria it would use to select the winner.",
+    "deliverable": "The final report was the main deliverable under the contract.",
+    "denotation": "The denotation of 'home' is a place where someone lives, though it may suggest much more.",
+    "eligibility": "Applicants must demonstrate eligibility before receiving benefits.",
+    "empathy": "Her empathy helped the anxious caller feel understood.",
+    "escalation": "The argument's escalation prompted the supervisor to intervene.",
+    "governance": "The nonprofit revised its governance rules to clarify board responsibilities.",
+    "milestone": "Completing the foundation was a major milestone in the project.",
+    "procurement": "The agency's procurement process requires competitive bidding.",
+    "qualitative": "The interviews yielded qualitative insights into customer experiences.",
+    "rationale": "The decision memo explained the rationale for choosing the more expensive option.",
+    "stakeholder": "Residents are important stakeholders in the proposed transit project.",
+    "syntax": "A misplaced comma changed the syntax of the sentence.",
+    "workflow": "The redesigned workflow removed two unnecessary approval steps.",
+    "predict": "Meteorologists predict heavy snowfall in the mountains tonight.",
+    "productivity": "The quieter workspace improved the team's productivity.",
+    "qualify": "Applicants must qualify for the loan before signing a purchase agreement.",
+    "quotation": "The article opened with a quotation from the scientist's speech.",
+    "revise": "The editor asked her to revise the introduction for clarity.",
+    "somber": "The crowd grew somber as the names of the victims were read aloud.",
+    "synthesis": "Her thesis offered a synthesis of findings from several smaller studies.",
+    "thesis": "The student defended her thesis before a panel of professors.",
+    "verify": "The clerk called the bank to verify the account information.",
+    "activate": "Press the green button to activate the emergency alarm.",
+    "affiliation": "His affiliation with the university allowed him to use its library.",
+    "allegory": "The story is an allegory about the dangers of unchecked power.",
+    "analyst": "The financial analyst compared revenue projections with actual sales.",
+    "authenticity": "Experts questioned the authenticity of the newly discovered letter.",
+    "availability": "The website shows the availability of appointments for next week.",
+    "bracket": "The editor placed the inserted explanation in square brackets.",
+    "calculus": "She studied calculus to better understand changing rates of motion.",
+    "candor": "Her candor about the budget shortfall earned the board's respect.",
+    "clarification": "The confusing policy prompted a request for clarification.",
+    "clarity": "The revised instructions brought much-needed clarity to the process.",
+    "classify": "The librarian will classify each book by subject.",
+    "commitment": "Finishing the program required a long-term commitment.",
+    "comprise": "The orchestra comprises musicians from ten countries.",
+    "conceptual": "The team sketched a conceptual design before preparing detailed plans.",
+    "corroborate": "Phone records corroborate the witness's account of the call.",
+    "credibility": "The journalist's credibility suffered after repeated factual errors.",
+    "critique": "The instructor offered a detailed critique of the student's draft.",
+    "denouement": "In the novel's denouement, the detective explains how the mystery was solved.",
+    "disclosure": "The buyer requested full disclosure of known structural problems.",
+    "documentation": "Keep documentation showing when the repairs were completed.",
+    "evaluation": "The program's evaluation included both surveys and performance data.",
+    "fallacy": "The claim that one event caused another merely because it came first is a fallacy.",
+    "feedback": "The testers gave feedback about confusing navigation buttons.",
+    "guideline": "The agency issued a guideline for handling sensitive requests.",
+    "implementation": "Implementation of the new system began after employee training.",
+    "indicator": "Rising attendance was an indicator of growing interest in the program.",
+    "literal": "The sign's literal meaning was clear, even though its tone was sarcastic.",
+    "mandate": "The new law gives the agency a mandate to inspect the facilities.",
+    "manipulate": "The researcher refused to manipulate the data to fit a preferred conclusion.",
+    "mediate": "A neutral volunteer offered to mediate the dispute between neighbors.",
+    "memoir": "In her memoir, she described growing up in a small coastal town.",
+    "methodology": "The paper explains the methodology used to collect the survey responses.",
+    "motivation": "Her motivation for learning Spanish was to speak with her grandparents.",
+    "operable": "The emergency exit must remain operable during a power outage.",
+    "orientation": "New employees attended an orientation on their first day.",
+    "oversight": "The committee provides oversight of the program's spending.",
+    "polemic": "His book was a fierce polemic against the proposed reforms.",
+    "probation": "The employee remained on probation for the first six months.",
+    "pronunciation": "The dictionary includes a recording of the word's pronunciation.",
+    "questionnaire": "Participants completed a questionnaire about their commuting habits.",
+    "redundancy": "Removing unnecessary repetition reduced redundancy in the instructions.",
+    "referral": "Her doctor provided a referral to a specialist.",
+    "refute": "The scientist used new evidence to refute the old theory.",
+    "relevance": "The attorney questioned the relevance of the photograph to the case.",
+    "responsive": "The website's responsive layout works on both phones and desktop monitors.",
+    "scenario": "The training included a scenario involving a difficult customer.",
+    "semantic": "The two sentences are grammatically different but have similar semantic content.",
+    "seminar": "She attended a seminar on writing effective grant proposals.",
+    "sensitivity": "The test has enough sensitivity to detect very small changes.",
+    "skepticism": "His skepticism about the claim grew when the seller refused an inspection.",
+    "specification": "The manufacturer listed the motor's electrical specification in the manual.",
+    "specify": "Please specify which model you want before placing the order.",
+    "abbreviation": "The abbreviation 'Dr.' stands for 'Doctor.'",
+    "abductive": "The detective used abductive reasoning to choose the most plausible explanation.",
+    "accounting": "The nonprofit's accounting records showed every grant expenditure.",
+    "acronym": "NASA is an acronym formed from the agency's name.",
+    "amortization": "The loan's amortization schedule shows how each payment reduces the balance.",
+    "ampersand": "The company used an ampersand in its name instead of spelling out 'and.'",
+    "analytic": "Her analytic approach helped isolate the cause of the production error.",
+    "analytics": "The retailer uses analytics to identify which products sell fastest.",
+    "annotation": "She added an annotation explaining the unusual phrase in the manuscript.",
+    "aphorism": "His favorite aphorism was that actions speak louder than words.",
+    "archetype": "The wandering hero is a familiar archetype in mythology.",
+    "asterisk": "An asterisk beside the price indicates that restrictions apply.",
+    "attribution": "Proper attribution identifies who created the photograph.",
+    "auditory": "The interface provides an auditory cue when an error occurs.",
+    "backlog": "The office hired temporary staff to clear its backlog of applications.",
+    "barrier": "A locked gate created a barrier to wheelchair access.",
+    "bibliography": "The book's bibliography lists the sources the author consulted.",
+    "bottleneck": "A slow approval step became the bottleneck in the entire process.",
+    "briefing": "The team received a briefing on the new security procedures.",
+    "capitalization": "The editor corrected the capitalization of the names in the headline.",
+    "cashflow": "Uneven cashflow made it difficult for the company to pay suppliers on time.",
+    "categorize": "The assistant will categorize the requests by urgency.",
+    "certification": "She earned a certification after passing the professional examination.",
+    "charter": "The committee's charter describes its purpose and authority.",
+    "closeout": "Contract closeout began after the final deliverables were accepted.",
+    "cohesion": "Transitions between the paragraphs improved the essay's cohesion.",
+    "collaborate": "Engineers and architects must collaborate to complete the design.",
+    "competency": "The assessment measures competency in spreadsheet formulas.",
+    "concision": "The editor valued concision and removed several unnecessary sentences.",
+    "conformance": "The inspection confirmed conformance with the published standard.",
+    "connote": "In this context, the word 'frugal' may connote good judgment rather than deprivation.",
+    "contest": "The losing bidder decided to contest the award.",
+    "contingency": "The budget includes a contingency for unexpected repair costs.",
+    "continue": "The roadwork will continue through the end of the month.",
+    "contracting": "The agency's contracting team reviewed the vendor's proposal.",
+    "counterargument": "She acknowledged the counterargument before explaining why she disagreed.",
+    "counterexample": "One counterexample was enough to disprove the claim that all birds can fly.",
+    "counteroffer": "The seller rejected the first bid but accepted the buyer's counteroffer.",
+    "decimal": "The measurement was rounded to two decimal places.",
+    "deescalate": "The supervisor spoke softly to deescalate the confrontation.",
+    "defensiveness": "His defensiveness made it hard for him to hear constructive criticism.",
+    "deployment": "The software deployment introduced the new features to all users.",
+    "determiner": "In the phrase 'those houses,' the word 'those' is a determiner.",
+    "discretionary": "The department postponed discretionary travel to protect its budget.",
+    "dismissive": "Her dismissive remark made the employee reluctant to raise another concern.",
+    "dissertation": "The doctoral candidate spent three years researching her dissertation.",
+    "doctoral": "He entered a doctoral program after completing his master's degree.",
+    "economics": "The course in economics examined how prices affect consumer behavior.",
+    "ellipsis": "The editor inserted an ellipsis to show that some words were omitted.",
+    "empathize": "It was easier to empathize with the caller after hearing her experience.",
+    "endnote": "The source citation appeared as an endnote at the back of the chapter.",
+    "enumerate": "The report will enumerate the steps required for certification.",
+    "equivocation": "His equivocation about the deadline made the team suspect he was hiding a delay.",
+    "etymology": "Studying the word's etymology revealed its Latin origins.",
+    "except": "Everyone attended the meeting except the regional manager.",
+    "excepted": "The policy excepted emergency purchases from the usual approval process.",
+    "excerpt": "The teacher read an excerpt from the opening chapter.",
+    "exemplify": "Her careful recordkeeping exemplifies professional diligence.",
+    "expected": "The expected delivery date is next Wednesday.",
+    "extrapolate": "The analyst warned against extrapolating the results of a small survey to the entire country.",
+    "facilitation": "Her facilitation kept the discussion focused and productive.",
+    "feasibility": "The engineers completed a feasibility study before starting construction.",
+    "fewer": "There were fewer complaints after the website redesign.",
+    "finding": "The inspection's most serious finding concerned exposed electrical wiring.",
+    "footnote": "A footnote identified the source of the historical claim.",
+    "foreshadowing": "The recurring sound of footsteps was foreshadowing of the later attack.",
+    "framing": "The framing of the question influenced how respondents answered.",
+    "fulltime": "She accepted a fulltime position after several months of temporary work.",
+    "funding": "The library delayed renovations until additional funding became available.",
+    "generalize": "You cannot generalize about all drivers from one unpleasant encounter.",
+    "hyphen": "A hyphen connects the words in 'well-known author.'",
+    "immanent": "The philosopher described divinity as immanent in the natural world.",
+    "include": "The rental agreement should include details about maintenance responsibilities.",
+    "initialism": "FBI is an initialism because its letters are spoken separately.",
+    "interpolate": "The scientist used neighboring measurements to interpolate a missing value.",
+    "inventory": "The shop counted its inventory before ordering more supplies.",
+    "invoice": "The contractor sent an invoice after completing the installation.",
+    "landmark": "The courthouse is a familiar landmark in the town square.",
+    "leverage": "The company used its large customer base to leverage a better price.",
+    "listening": "Active listening helped her understand why the customer was upset.",
+    "mitigation": "Installing drainage channels was part of the flood-risk mitigation plan.",
+    "modifier": "In 'extremely cold,' the word 'extremely' is a modifier.",
+    "morphology": "The linguist studied the morphology of words formed with prefixes.",
+    "notation": "The engineer used a special notation to label the circuit diagram.",
+    "nuance": "Her response acknowledged the nuance of a situation with competing priorities.",
+    "offeror": "Each offeror must submit a complete price proposal before the deadline.",
+    "optimize": "The team adjusted the route to optimize delivery times.",
+    "orthography": "The course examines English orthography and its unusual spelling rules.",
+    "parallelism": "The editor used parallelism to give the three recommendations a consistent structure.",
+    "parentheses": "The author put the explanation in parentheses so it would not interrupt the sentence.",
+    "parenthesis": "A parenthesis added extra information about the date of the event.",
+    "parttime": "He worked parttime while completing his degree.",
+    "patronize": "Please do not patronize experienced employees by explaining things they already know.",
+    "patronizing": "The patronizing tone made the audience feel underestimated.",
+    "perceivable": "Screen-reader labels make information perceivable to users who cannot see the screen.",
+    "pertinent": "The investigator asked only questions pertinent to the complaint.",
+    "phonology": "The linguistics class examined the phonology of regional dialects.",
+    "plagiarism": "Copying the article without credit was plagiarism.",
+    "plausibility": "Investigators questioned the plausibility of an alibi that changed three times.",
+    "plural": "The plural of 'mouse' is 'mice.'",
+    "possessive": "The apostrophe in 'teacher's desk' marks the possessive form.",
+    "predictive": "The hospital tested a predictive model for anticipating patient demand.",
+    "preposition": "In 'under the table,' the word 'under' is a preposition.",
+    "prerequisite": "College algebra is a prerequisite for the advanced statistics course.",
+    "prescriptive": "The style guide gives prescriptive rules for punctuation.",
+    "pronoun": "In 'she opened the door,' the word 'she' is a pronoun.",
+    "proofread": "She took ten minutes to proofread the email before sending it.",
+    "proofreading": "Careful proofreading caught three missing commas in the report.",
+    "publisher": "The publisher announced a new edition of the textbook.",
+    "qualified": "Only qualified electricians may work on the main panel.",
+    "qualifier": "The word 'usually' is a qualifier that makes the statement less absolute.",
+    "quantify": "The team tried to quantify the benefits of the training program.",
+    "randomize": "Researchers used software to randomize the order of the survey questions.",
+    "rapport": "The counselor built rapport by listening without interrupting.",
+    "rationalize": "He tried to rationalize his mistake instead of admitting it.",
+    "reasoning": "The judge asked the attorney to explain the reasoning behind the request.",
+    "rebut": "She used the official records to rebut the accusation.",
+    "rebuttal": "His rebuttal addressed each of the opposing claims in turn.",
+    "receivable": "The unpaid invoice remained an account receivable until the customer paid.",
+    "reframe": "She helped reframe the conflict as a scheduling problem rather than a personal attack.",
+    "refutation": "The published study offered a detailed refutation of the earlier theory.",
+    "regression": "The analyst used regression to estimate how income relates to spending.",
+    "replicate": "The researchers were unable to replicate the surprising result.",
+    "replication": "Independent replication strengthened confidence in the findings.",
+    "responsiveness": "The reviewers measured the contractor's responsiveness to each requirement.",
+    "runon": "The editor divided the runon sentence into two clearer sentences.",
+    "sampling": "Random sampling reduced the risk of selecting only satisfied customers.",
+    "scholarly": "The paper cited several scholarly articles on the topic.",
+    "semantics": "A debate about the semantics of 'fairness' delayed the vote.",
+    "simplified": "The simplified instructions helped new users complete the form.",
+    "skeptical": "The accountant was skeptical of the unusually large deduction.",
+    "spacing": "The editor increased the line spacing to improve readability.",
+    "specialize": "The firm decided to specialize in historic-home restoration.",
+    "stewardship": "Responsible stewardship of public funds requires careful oversight.",
+    "subheading": "A clear subheading introduced the section on repair costs.",
+    "subpart": "The lawyer cited a specific subpart of the regulation.",
+    "surveillance": "Security cameras provided surveillance of the loading area.",
+    "synthesize": "Students must synthesize information from several sources into one argument.",
+    "taxonomy": "The biologist developed a taxonomy for classifying the newly discovered organisms.",
+    "throughput": "The factory improved throughput by reducing time between production stages.",
+    "tradeoff": "The tradeoff for a lower price was a longer delivery time.",
+    "transparency": "The agency published its spending records to improve transparency.",
+    "unlikely": "It is unlikely that the train will arrive early during the storm.",
+    "validate": "The technician will validate the test results with a second instrument.",
+    "validation": "Independent validation showed that the calculator produced accurate totals.",
+    "verbosity": "The instructions suffered from verbosity that obscured the key steps.",
+    "vernacular": "The novelist used the local vernacular to make the dialogue believable.",
+    "vignette": "The biography begins with a short vignette about the author's childhood.",
+    "workload": "The nurse's workload increased sharply during flu season.",
+    "aggression": "The coach warned that aggression toward officials would not be tolerated.",
+    "amenable": "The landlord was amenable to repairing the fence before move-in.",
+    "attainment": "Her attainment of the highest certification took years of study.",
+    "catastrophe": "The earthquake caused a catastrophe across the region.",
+    "cautious": "He remained cautious about investing in an unfamiliar company.",
+    "clamor": "The clamor outside the courthouse could be heard from the courtroom.",
+    "commence": "Construction will commence after the permits are approved.",
+    "comparative": "The essay offered a comparative study of two political systems.",
+    "competent": "A competent electrician can identify the source of the fault.",
+    "comprehend": "The dense legal wording was difficult for new employees to comprehend.",
+    "concentration": "She needed complete concentration to solve the complicated puzzle.",
+    "contradictory": "The witnesses gave contradictory accounts of the crash.",
+    "contribute": "Volunteers contribute hundreds of hours to the food bank each month.",
+    "convenience": "Online scheduling offers greater convenience for working parents.",
+    "cordial": "The two rivals maintained a cordial relationship despite their disagreement.",
+    "corrupt": "The investigation uncovered a corrupt official who accepted bribes.",
+    "counsel": "She sought counsel from an attorney before signing the agreement.",
+    "courteous": "The clerk remained courteous despite the customer's impatience.",
+    "delegate": "The director decided to delegate the scheduling task to an assistant.",
+    "desperation": "In desperation, he called every nearby shelter for help.",
+    "devise": "The engineers had to devise a way to cool the equipment without fans.",
+    "discrimination": "The applicant alleged discrimination after being denied an interview because of age.",
+    "disguise": "The thief wore a disguise to avoid recognition.",
+    "dominance": "The company's dominance in the market worried smaller competitors.",
+    "elegant": "The architect proposed an elegant solution that was both simple and attractive.",
+    "embassy": "The traveler contacted the embassy after losing her passport.",
+    "entity": "The charity operates as a separate legal entity.",
+    "exclusive": "The members received exclusive access to the early exhibition.",
+    "exempt": "Small businesses may be exempt from certain filing requirements.",
+    "exploit": "The attacker tried to exploit a weakness in the website's security.",
+    "facility": "The new sports facility includes a swimming pool and gymnasium.",
+    "falsehood": "The article repeated a falsehood that had already been disproved.",
+    "fateful": "A fateful decision to leave early saved the family from the storm.",
+    "foresight": "Her foresight in keeping emergency supplies proved valuable during the outage.",
+    "fugitive": "Police searched the region for a fugitive who escaped custody.",
+    "generosity": "Her generosity funded scholarships for students in need.",
+    "grandeur": "Visitors admired the grandeur of the cathedral's vaulted ceiling.",
+    "hideous": "A hideous smell spread from the overflowing dumpster.",
+    "hindrance": "Poor internet service became a hindrance to remote work.",
+    "humiliation": "He felt humiliation when the mistake was announced to the entire staff.",
+    "implicate": "The records may implicate another employee in the fraud.",
+    "inclination": "She had an inclination to postpone the trip until spring.",
+    "inherent": "Every investment carries some inherent risk.",
+    "injunction": "The judge issued an injunction stopping construction until the dispute was resolved.",
+    "inspiration": "The scientist found inspiration in a simple question from her daughter.",
+    "intensity": "The intensity of the storm increased after midnight.",
+    "intermediate": "He enrolled in an intermediate course after mastering the basics.",
+    "intolerable": "The noise became intolerable after three sleepless nights.",
+    "intrigue": "The mysterious letter began to intrigue the young historian.",
+    "ironic": "It was ironic that the safety inspector forgot his own helmet.",
+    "judiciary": "The judiciary must interpret the law independently of the legislature.",
+    "luminous": "The luminous dial remained easy to read in the dark.",
+    "momentum": "The campaign gained momentum after the first successful fundraiser.",
+    "monotonous": "The monotonous hum of the machine made the shift seem endless.",
+    "palpable": "The tension in the room was palpable as the verdict approached.",
+    "pledge": "The mayor made a pledge to repair the damaged roads.",
+    "plunder": "Invaders began to plunder the city after its defenses collapsed.",
+    "preservation": "The historical society raised money for preservation of the old theater.",
+    "prevail": "After several appeals, the residents finally prevailed in court.",
+    "proliferation": "The proliferation of misleading websites made reliable information harder to find.",
+    "reassure": "The doctor tried to reassure the worried patient.",
+    "resentment": "Years of unequal treatment created resentment among the staff.",
+    "resignation": "Her resignation surprised colleagues who expected her to stay for years.",
+    "sarcastic": "His sarcastic praise made it clear he disliked the proposal.",
+    "scanty": "The expedition struggled with scanty supplies of food and water.",
+    "surplus": "The city used its budget surplus to repair sidewalks.",
+    "suspicious": "The banker noticed several suspicious transfers from the account.",
+    "systematic": "The investigators conducted a systematic review of the records.",
+    "unreasonable": "The landlord's demand for payment within an hour seemed unreasonable.",
+    "verdict": "The jury returned a verdict of not guilty.",
+    "zealous": "The zealous volunteer arrived early for every fundraiser.",
+    "insolence": "The employee's open insolence toward customers led to a formal warning.",
+    "intangible": "Trust is an intangible asset that cannot be listed as a piece of equipment.",
+    "integral": "Regular maintenance is integral to keeping the machines safe.",
+    "intemperance": "His intemperance at the banquet embarrassed his colleagues.",
+    "intercede": "Her mentor offered to intercede with the director on her behalf.",
+    "intermediary": "The broker acted as an intermediary between the buyer and seller.",
+    "intrinsic": "The artwork has intrinsic value beyond its potential resale price.",
+    "introspective": "After the argument, he grew introspective about his own behavior.",
+    "intuition": "Her intuition told her that the seemingly simple explanation was incomplete.",
+    "irrefutable": "The video provided irrefutable evidence that the bridge was already damaged.",
+    "irresolute": "The irresolute committee postponed its decision for a third time.",
+    "irrevocable": "Once signed, the transfer became irrevocable under the agreement.",
+    "judicious": "A judicious use of savings kept the family out of debt.",
+    "lassitude": "Weeks of illness left him with a heavy sense of lassitude.",
+    "loathsome": "The prisoners described the cell's loathsome conditions.",
+    "malevolence": "His deliberate efforts to ruin the charity revealed unmistakable malevolence.",
+    "malevolent": "The villain's malevolent scheme targeted innocent families.",
+    "malicious": "Someone sent malicious messages intended to damage her reputation.",
+    "manifold": "The proposed change would have manifold effects on the school system.",
+    "multiplicity": "The policy created a multiplicity of confusing exceptions.",
+    "mysticism": "Her interest in mysticism led her to study ancient spiritual traditions.",
+    "necessitate": "The collapsed ceiling will necessitate extensive structural repairs.",
+    "obliterate": "The wildfire threatened to obliterate the small mountain settlement.",
+    "opportune": "The unexpected discount arrived at an opportune moment for the buyer.",
+    "opulence": "The palace's marble floors and gold chandeliers displayed extraordinary opulence.",
+    "ordnance": "The military team safely removed unexploded ordnance from the field.",
+    "palliative": "The treatment was palliative, easing pain without curing the disease.",
+    "pecuniary": "The court awarded pecuniary damages to compensate for lost wages.",
+    "perilous": "The climbers faced a perilous descent during the blizzard.",
+    "pernicious": "The pernicious rumor slowly destroyed trust within the organization.",
+    "ponderous": "The speaker's ponderous explanation turned a simple point into a long ordeal.",
+    "populism": "The candidate's populism appealed to voters who distrusted established elites.",
+    "precarious": "The ladder rested in a precarious position against the loose wall.",
+    "precursor": "A sudden drop in pressure can be a precursor to severe weather.",
+    "predilection": "She has a predilection for historical mysteries over contemporary thrillers.",
+    "predisposition": "Family history may indicate a predisposition to certain illnesses.",
+    "preposterous": "The suggestion that the entire building moved overnight was preposterous.",
+    "profligate": "The profligate spender exhausted his inheritance in less than a year.",
+    "profundity": "The professor admired the profundity of the student's question.",
+    "profusion": "Wildflowers bloomed in profusion after the spring rains.",
+    "prospective": "Prospective tenants toured the apartment on Saturday.",
+    "provincialism": "His provincialism made him suspicious of anyone from outside his hometown.",
+    "prudence": "Financial prudence led them to establish an emergency savings fund.",
+    "querulous": "The querulous passenger complained about every stop along the route.",
+    "reciprocity": "Their friendship depended on reciprocity rather than one person doing all the favors.",
+    "reprehensible": "The committee condemned the official's reprehensible abuse of power.",
+    "reprimand": "The supervisor issued a reprimand after the employee ignored safety rules.",
+    "residual": "A residual odor remained after the smoke damage was cleaned.",
+    "resonance": "The speech had emotional resonance for people who had experienced similar losses.",
+    "retaliate": "The employee feared the manager would retaliate after she reported misconduct.",
+    "reticent": "The usually reticent engineer spoke at length about the design flaw.",
+    "reverence": "The congregation listened with reverence as the old hymn began.",
+    "salutary": "The brief setback had a salutary effect, prompting the team to improve its process.",
+    "scarcity": "A scarcity of affordable homes drove rents higher.",
+    "scintillating": "Her scintillating conversation kept the dinner guests entertained.",
+    "scornful": "He gave a scornful laugh when the proposal was presented.",
+    "seclusion": "The writer sought seclusion in a cabin far from the city.",
+    "speculative": "The article's claim was speculative and unsupported by direct evidence.",
+    "stagnant": "Water in the stagnant pond attracted mosquitoes.",
+    "subsidiary": "The corporation created a subsidiary to manage its overseas operations.",
+    "subsistence": "The farmers grew barely enough food for their own subsistence.",
+    "subversive": "The regime banned the artist's subversive criticism of its leaders.",
+    "tenacious": "The tenacious investigator kept searching long after others had given up.",
+    "tenacity": "Her tenacity carried her through years of demanding training.",
+    "treasonable": "The general was accused of treasonable acts against his country.",
+    "trepidation": "He approached the difficult conversation with trepidation.",
+    "tyrannical": "The tyrannical ruler imprisoned people for criticizing him.",
+    "unabashed": "She was unabashed about celebrating her unconventional fashion choices.",
+    "undaunted": "Undaunted by the first rejection, he submitted a stronger application.",
+    "unparalleled": "The athlete's record represented unparalleled success in her sport.",
+    "unsolicited": "The company sent an unsolicited sales pitch to every office.",
+    "upheaval": "The sudden merger caused upheaval among employees.",
+    "vanquish": "The defending army finally vanquished the invading force.",
+    "vehement": "She made a vehement objection to the proposal.",
+    "veneration": "The community's veneration of the retired teacher was evident at her memorial.",
+    "veritable": "The small attic contained a veritable treasure trove of forgotten letters.",
+    "vexatious": "The repeated, frivolous lawsuits became a vexatious burden on the organization.",
+    "vigilance": "Constant vigilance helped the lifeguard spot the struggling swimmer.",
+    "vivacity": "Her vivacity enlivened an otherwise quiet gathering.",
+    "volatile": "The volatile chemical must be kept away from heat and sparks.",
+    "volition": "He left the position of his own volition rather than being dismissed.",
+    "adverse": "The medication caused an adverse reaction in a small number of patients.",
+    "affinity": "She felt an immediate affinity for the quiet mountain town.",
+    "antipathy": "His antipathy toward bureaucracy made routine paperwork frustrating.",
+    "ascertain": "The investigators tried to ascertain exactly when the equipment failed.",
+    "assent": "The committee gave its assent to the proposed changes.",
+    "censure": "The board voted to censure the member for violating its ethics rules.",
+    "cession": "The treaty required the cession of disputed territory to the neighboring state.",
+    "compel": "The court may compel the witness to produce the documents.",
+    "composure": "She maintained her composure even as the audience criticized her.",
+    "compulsory": "Attendance at the safety training was compulsory for all employees.",
+    "conclusive": "The tests produced conclusive evidence of a manufacturing defect.",
+    "confidential": "The attorney kept the client's financial records confidential.",
+    "conjecture": "Without access to the records, his explanation remained conjecture.",
+    "consequent": "The river flooded, with consequent damage to roads and farmland.",
+    "consequential": "The board faced a consequential decision about the hospital's future.",
+    "contemplate": "She took several weeks to contemplate the job offer.",
+    "contemporary": "The museum exhibited contemporary paintings alongside older works.",
+    "contemptible": "His contemptible decision to exploit the elderly drew widespread condemnation.",
+    "copious": "The witness kept copious notes throughout the investigation.",
+    "corruption": "The inquiry uncovered corruption in the city's purchasing office.",
+    "deference": "The apprentice spoke with deference to the experienced carpenter.",
+    "defiance": "The protesters continued their march in defiance of the order.",
+    "diminution": "A gradual diminution in rainfall threatened the region's crops.",
+    "efficacious": "Clinical trials found the treatment efficacious against the infection.",
+    "erratic": "The car's erratic movement made other drivers slow down.",
+    "faction": "A small faction within the party opposed the agreement.",
+    "forfeit": "Players who arrive late must forfeit the match.",
+    "imperialism": "The historian examined how imperialism reshaped trade and political borders.",
+    "incoherent": "The witness's incoherent account jumped between unrelated events.",
+    "indispensable": "Clean drinking water is indispensable to public health.",
+    "indulgence": "He allowed himself the occasional indulgence of an expensive dessert.",
+    "industrious": "The industrious crew completed the repairs ahead of schedule.",
+    "ingenious": "The engineer designed an ingenious mechanism using only two moving parts.",
+    "insolent": "The insolent remark offended the entire committee.",
+    "jurisprudence": "The legal scholar taught a course on constitutional jurisprudence.",
+    "lucrative": "Her small consulting business became lucrative after securing several clients.",
+    "negligence": "The lawsuit alleged negligence in maintaining the unsafe stairway.",
+    "ominous": "Dark clouds gathered above the harbor in an ominous formation.",
+    "oppression": "Generations of oppression shaped the community's struggle for equal rights.",
+    "orator": "The gifted orator held the crowd's attention for nearly an hour.",
+    "orthodox": "His orthodox interpretation followed the traditional teachings exactly.",
+    "partisan": "The openly partisan editorial favored one political party.",
+    "patronage": "The museum depended on the patronage of wealthy donors.",
+    "predominate": "Pine trees predominate in the northern part of the forest.",
+    "prestige": "The award brought international prestige to the small university.",
+    "prominence": "Her research gained prominence after the discovery was independently confirmed.",
+    "prophecy": "The ancient prophecy warned of a winter that would last for years.",
+    "propriety": "The committee questioned the propriety of accepting gifts from bidders.",
+    "prosecution": "The prosecution presented its evidence before the defense called any witnesses.",
+    "reclamation": "The city's reclamation of abandoned industrial land created a new park.",
+    "regime": "The new regime imposed restrictions on independent newspapers.",
+    "relentless": "Relentless rain continued for four days without a break.",
+    "renounce": "He decided to renounce his claim to the inheritance.",
+    "requisite": "Applicants must possess the requisite training before operating the crane.",
+    "resultant": "The resultant pressure damaged several joints in the pipeline.",
+    "resumption": "The resumption of train service followed repairs to the damaged tracks.",
+    "sanction": "The government imposed a sanction on the company for violating trade restrictions.",
+    "scrutiny": "The unusual payments came under intense scrutiny from auditors.",
+    "servile": "His servile flattery made coworkers uncomfortable.",
+    "strife": "Years of civil strife forced families to leave their homes.",
+    "submissive": "The usually outspoken employee became submissive around the threatening supervisor.",
+    "subordinate": "The captain assigned the routine task to a subordinate officer.",
+    "substantial": "The repairs required a substantial investment of money and labor.",
+    "superfluous": "The report contained several superfluous paragraphs that repeated earlier points.",
+    "superiority": "The team claimed the superiority of its design after the successful trial.",
+    "tribunal": "An independent tribunal heard the dispute between the two organizations.",
+    "turmoil": "The unexpected resignation threw the company into turmoil.",
+    "tyranny": "The citizens revolted after decades of tyranny.",
+    "unanimous": "The board's vote was unanimous, with every member supporting the plan.",
+    "beatific": "Her beatific smile suggested a serenity untouched by the surrounding chaos.",
+    "bilious": "The critic wrote a bilious review full of bitter personal attacks.",
+    "cabal": "A small cabal of officials secretly plotted to remove the director.",
+    "baleful": "The guard gave the intruder a baleful stare.",
+    "bibulous": "His bibulous habits made late-night banquets a regular occurrence.",
+    "declivity": "Loose stones rolled down the steep declivity toward the road.",
+    "grandiloquent": "The grandiloquent speech promised to transform civilization but offered no practical plan.",
+    "interregnum": "During the interregnum, a temporary council governed the kingdom.",
+    "soporific": "The speaker's soporific delivery sent several listeners to sleep.",
+    "stentorian": "His stentorian voice carried across the crowded auditorium without a microphone.",
+    "abjure": "The former extremist publicly abjured his earlier beliefs.",
+    "abrogate": "The legislature voted to abrogate the outdated treaty.",
+    "abscond": "The treasurer tried to abscond with the charity's donations.",
+    "acedia": "The monk struggled with acedia, a spiritual listlessness that drained his devotion.",
+    "aleatory": "The composer incorporated aleatory passages whose notes were determined by chance.",
+    "anomie": "After the community's institutions collapsed, widespread anomie left people without clear social norms.",
+    "aporia": "The philosopher's aporia emerged when neither answer to the dilemma seemed defensible.",
+    "apotropaic": "The villagers hung apotropaic charms over their doors to ward off evil.",
+    "atavistic": "An atavistic fear of predators stirred when he heard growling in the dark.",
+    "autochthonous": "The researchers studied autochthonous species that originated in the isolated valley.",
+    "bathos": "The tragedy ended in bathos when the hero interrupted his farewell speech to ask for a snack.",
+    "brumal": "A brumal chill settled over the empty fields in December.",
+    "caliginous": "Only a weak lantern pierced the caliginous mist.",
+    "chthonic": "The ancient myth described chthonic deities dwelling beneath the earth.",
+    "coruscate": "The chandelier's crystals seemed to coruscate in the candlelight.",
+    "demotic": "The poet preferred demotic speech to the elaborate language of the royal court.",
+    "desuetude": "The forgotten ordinance fell into desuetude after decades without enforcement.",
+    "disquisition": "The scholar published a lengthy disquisition on medieval trade routes.",
+    "effulgent": "The effulgent sunrise flooded the valley with brilliant golden light.",
+    "encomium": "The retiring professor received an encomium praising decades of teaching.",
+    "epigrammatic": "Her epigrammatic wit compressed sharp observations into memorable single sentences.",
+    "eudaimonia": "The philosopher associated eudaimonia with a flourishing life guided by virtue.",
+    "fuliginous": "The old furnace left fuliginous soot on the surrounding bricks.",
+    "hebetude": "After days without sleep, a sense of hebetude clouded his thinking.",
+    "hermetic": "The novel's hermetic symbolism frustrated readers unfamiliar with its private references.",
+    "limn": "The artist used delicate lines to limn the dancer's silhouette.",
+    "logorrhea": "His logorrhea turned a five-minute update into an hour-long monologue.",
+    "magniloquent": "The candidate's magniloquent promises sounded impressive but lacked substance.",
+    "metonymy": "Using 'the crown' to mean the monarchy is an example of metonymy.",
+    "miasma": "A foul miasma rose from the stagnant marsh at dusk.",
+    "noetic": "The essay explored noetic experiences associated with intellectual insight.",
+    "nugatory": "The missing signature rendered the supposed agreement nugatory.",
+    "peregrination": "Her peregrination across remote villages took most of the summer.",
+    "periphrasis": "Instead of saying 'died,' his periphrasis described the man as having departed this world.",
+    "phantasmagoria": "The stage lights created a phantasmagoria of shifting shadows and monstrous shapes.",
+    "philippic": "The senator delivered a furious philippic against official corruption.",
+    "picayune": "They wasted an hour arguing over a picayune difference in formatting.",
+    "plenipotentiary": "The president sent a plenipotentiary authorized to negotiate and sign the treaty.",
+    "prelapsarian": "The painting imagined a prelapsarian garden untouched by human wrongdoing.",
+    "propinquity": "Years of working side by side created a feeling of propinquity between the colleagues.",
+    "pusillanimous": "The pusillanimous official refused to defend his staff when they were falsely accused.",
+    "rebarbative": "The reviewer's rebarbative manner discouraged students from asking questions.",
+    "refulgent": "The mountain peaks were refulgent in the late afternoon sunlight.",
+    "sybaritic": "The tycoon's sybaritic lifestyle included lavish meals and extravagant vacations.",
+    "thaumaturgy": "The villagers credited the healer's supposed thaumaturgy with miraculous recoveries.",
+    "ululate": "Wolves began to ululate beyond the frozen river.",
+    "uxorious": "The uxorious king deferred to his wife on almost every decision.",
+    "vituperative": "The debate dissolved into vituperative insults rather than reasoned criticism.",
   });
 
-  function studyIllustrations(word, dictionaryExamples) {
-    if (Array.isArray(dictionaryExamples) && dictionaryExamples.length) {
-      return {examples:dictionaryExamples, exampleSource:'dictionary'};
-    }
+  // A few high-impact polysemous words need explicit meaning-specific examples.
+  // The test matches the selected dictionary definition, not merely the headword.
+  const MEANING_GUIDES = Object.freeze({
+    sanction: [
+      {test:/approv|authoriz|permission|consent|official support/i, definition:'Official approval or permission', example:'The committee gave its sanction to the revised plan.'},
+      {test:/penalt|punish|restrict|coerc|enforc|measure taken/i, definition:'A penalty or restrictive measure', example:'The agency imposed a sanction on the company for violating trade rules.'}
+    ],
+    oversight: [
+      {test:/supervis|oversee|watch|monitor|administr|manage|direct/i, definition:'Supervision or monitoring', example:'The committee provides oversight of the agency’s spending.'},
+      {test:/error|mistake|omission|fail|inadvert/i, definition:'An accidental mistake or omission', example:'The missing signature was an oversight rather than an attempt to deceive.'}
+    ],
+    qualified: [
+      {test:/competent|capab|skill|train|fit|credential/i, definition:'Having the required skills or credentials', example:'Only qualified electricians may work on the main panel.'},
+      {test:/limit|reserv|restrict|condition|not absolute/i, definition:'Limited by conditions or reservations', example:'She gave qualified support to the plan but wanted a clearer budget.'}
+    ],
+    draft: [
+      {test:/prelim|early|version|sketch|not final|written|document/i, definition:'A preliminary version of a document', example:'The attorney prepared a draft of the agreement for review.'},
+      {test:/current of air|airflow|breeze/i, definition:'A current of air', example:'A cold draft slipped through the gap beneath the door.'}
+    ],
+    resolution: [
+      {test:/settle|solution|decision|resolve|agreement|determination/i, definition:'A decision or settlement', example:'Negotiations finally brought a peaceful resolution to the dispute.'},
+      {test:/clarity|detail|pixel|image|screen/i, definition:'The amount of detail in an image', example:'The larger monitor displayed the diagram at a higher resolution.'}
+    ],
+    effect: [
+      {test:/result|consequence|outcome|change produced/i, definition:'A result or consequence', example:'The policy had an immediate effect on delivery times.'},
+      {test:/bring about|cause|make happen|accomplish/i, definition:'To bring about a change', example:'The new director hoped to effect lasting improvements.'}
+    ],
+    principal: [
+      {test:/main|chief|most important|leading/i, definition:'Main or most important', example:'Her principal concern was the building’s electrical system.'},
+      {test:/amount of money|loan|debt|invest|capital/i, definition:'The original sum borrowed or invested', example:'Extra payments reduced the mortgage principal.'}
+    ],
+    register: [
+      {test:/sign|enroll|record a name|list/i, definition:'To enter a name on an official list', example:'Visitors must register at the front desk.'},
+      {test:/style of language|level of formality|tone of speech/i, definition:'A level or style of language', example:'The speaker shifted to a formal register during the ceremony.'}
+    ],
+    frame: [
+      {test:/formulat|present|interpret|describe|phrase/i, definition:'To present or describe in a particular way', example:'She chose to frame the disagreement as a solvable scheduling problem.'},
+      {test:/structure|border|support|surround/i, definition:'A supporting structure or border', example:'The carpenter repaired the wooden frame around the window.'}
+    ],
+    claim: [
+      {test:/assert|say|state|maintain|alleg/i, definition:'An assertion that something is true', example:'The witness made a claim that the alarm had been disabled.'},
+      {test:/demand|right to|request for payment|insurance/i, definition:'A request for something owed or legally due', example:'She filed an insurance claim after the storm damaged the roof.'}
+    ],
+    leverage: [
+      {test:/influenc|advantage|power|negotia/i, definition:'Influence used to gain an advantage', example:'The buyer used competing quotes as leverage in negotiations.'},
+      {test:/borrow|debt|finance|investment/i, definition:'The use of borrowed money', example:'The investor used leverage to purchase a larger property.'}
+    ],
+    convention: [
+      {test:/custom|usual|accepted|practice|tradition/i, definition:'A generally accepted custom', example:'Removing your shoes indoors is a convention in many households.'},
+      {test:/meeting|assembly|conference/i, definition:'A large formal gathering', example:'The teachers attended a national convention in Chicago.'}
+    ],
+    obscure: [
+      {test:/unknown|little known|hard to understand|unclear/i, definition:'Not widely known or difficult to understand', example:'The historian uncovered an obscure law that few people remembered.'},
+      {test:/hide|block|cover|conceal|darken/i, definition:'To make difficult to see', example:'Heavy fog began to obscure the harbor lights.'}
+    ],
+    novel: [
+      {test:/new|unusual|original/i, definition:'New or unusual', example:'The engineer proposed a novel way to conserve water.'},
+      {test:/fiction|book|story/i, definition:'A long work of fictional prose', example:'She finished reading the novel during her vacation.'}
+    ]
+  });
+
+  function meaningGuide(word, definition) {
+    const guides=MEANING_GUIDES[String(word || '').toLowerCase()] || [];
+    return guides.find(guide=>guide.test.test(String(definition || ''))) || null;
+  }
+
+  function studyIllustrations(word, dictionaryExamples, chosenDefinition) {
+    const guide=meaningGuide(word,chosenDefinition);
+    if (guide) return {examples:[guide.example],exampleSource:'sense-guide'};
+    // A full, matched dictionary sentence is preferable to a generic gloss.
+    const fullDictionary=(Array.isArray(dictionaryExamples) ? dictionaryExamples : []).filter(looksLikeSentence);
+    if (fullDictionary.length) return {examples:fullDictionary,exampleSource:'dictionary'};
     const curated=CURATED_EXAMPLES[String(word || '').toLowerCase()];
-    return curated ? {examples:[curated],exampleSource:'app'} : {examples:[],exampleSource:'none'};
+    if (curated && looksLikeSentence(curated)) return {examples:[curated],exampleSource:'app'};
+    // Custom words without a reliable sentence are held out of practice until
+    // a useful dictionary illustration is available. Never display an empty card.
+    return {examples:[],exampleSource:'none'};
+  }
+
+  function alternateMeanings(word, primary, studyDefinitions) {
+    const selected=String(primary || '').trim();
+    const candidates=[];
+    const guides=MEANING_GUIDES[String(word || '').toLowerCase()] || [];
+    for (const guide of guides) {
+      if (guide === meaningGuide(word,selected)) continue;
+      candidates.push({definition:guide.definition,example:guide.example});
+    }
+    for (const definition of studyDefinitions || []) {
+      if (!definition || definition.toLowerCase()===selected.toLowerCase()) continue;
+      if (!isPedagogicallyUsefulDefinition(definition,word)) continue;
+      if (definitionSimilarity(definition,selected) >= .5) continue;
+      if (candidates.some(entry=>definitionSimilarity(entry.definition,definition)>.45)) continue;
+      const guide=meaningGuide(word,definition);
+      if (guide && candidates.some(entry=>entry.example===guide.example)) continue;
+      candidates.push({definition,example:guide?.example || ''});
+      if (candidates.length>=3) break;
+    }
+    return candidates.slice(0,3);
   }
 
   function pronunciationAudioUrl(entry) {
@@ -1695,7 +2484,7 @@
     const definition = chooseStudyDefinition(studyDefinitions, word);
     const quizDefinition = chooseQuizDefinition(studyDefinitions, word);
     const answerDefinition = chooseAnswerDefinition(studyDefinitions, word);
-    const illustrations=studyIllustrations(word,examplesForTeachingSense(entry,definition));
+    const illustrations=studyIllustrations(word,examplesForTeachingSense(entry,answerDefinition),answerDefinition);
     const examples=illustrations.examples;
     if (!definition || !quizDefinition) throw new Error(`No useful quiz definition for ${word}.`);
     return {
@@ -1711,6 +2500,7 @@
       example:examples[0] || '',
       examples,
       exampleSource:illustrations.exampleSource,
+      alternateMeanings:alternateMeanings(word,answerDefinition,studyDefinitions),
       syllables:String(entry.hwi?.hw || '').replace(/\*/g,'·').replace(/\s+/g,' ').trim(),
       audioUrl:pronunciationAudioUrl(entry),
       origin:wordOrigin(entry),
@@ -1911,10 +2701,17 @@
     const mainDefinition=String(dictionary?.definition || '').trim();
     const more=definitions.filter(definition=>String(definition).trim()!==mainDefinition).slice(0,3);
     const details=$('wordDefinitionsDetails'); const list=$('wordDefinitionList');
+    const altMeanings=Array.isArray(dictionary?.alternateMeanings) ? dictionary.alternateMeanings : [];
     list.innerHTML='';
-    for (const def of more) { const li=document.createElement('li'); li.textContent=def; list.appendChild(li); }
-    details.classList.toggle('hidden', more.length===0);
-    if (!more.length) details.open=false;
+    const listed=altMeanings.length ? altMeanings : more.map(definition=>({definition,example:''}));
+    for (const {definition,example} of listed) {
+      const li=document.createElement('li');
+      const text=document.createElement('span'); text.textContent=definition; li.appendChild(text);
+      if (example) { const p=document.createElement('p'); p.className='other-meaning-example'; p.textContent=example; li.appendChild(p); }
+      list.appendChild(li);
+    }
+    details.classList.toggle('hidden',listed.length===0);
+    if (!listed.length) details.open=false;
 
     const save=$('wordSaveButton');
     save.classList.toggle('hidden', saved);
@@ -2286,6 +3083,11 @@
     if (!targetResult?.entry) throw targetResult?.error || new Error(`No usable definition for ${item.word}.`);
     const target=targetResult.entry;
     if (!target.quizDefinition) throw new Error(`No useful quiz definition for ${item.word}.`);
+    if (!looksLikeSentence(target.example)) {
+      const error=new Error(`No accurate sentence is available for ${item.word} in this meaning.`);
+      error.code='UNUSABLE_QUESTION';
+      throw error;
+    }
 
     const candidates=[];
     const seenDefinitions=new Set([String(target.quizDefinition||'').toLowerCase().trim()]);
@@ -2387,7 +3189,8 @@
       $('feedbackWord').textContent = 'Question unavailable';
       $('feedbackDefinition').textContent = `${error.message} Check your connection and API key, then try again.`;
       $('feedbackExampleLabel').textContent = 'Example';
-      $('feedbackExample').textContent = 'No example for this question.';
+      $('feedbackExample').textContent = 'Question unavailable.';
+      $('feedbackOtherMeanings').classList.add('hidden');
       $('wordFacts').innerHTML = '';
       $('detailsButton').classList.add('hidden');
       $('feedbackSaveButton').classList.add('hidden');
@@ -2403,6 +3206,7 @@
     $('loadingQuestion').classList.add('hidden');
     $('questionCard').classList.remove('hidden');
     $('questionCard').removeAttribute('aria-hidden');
+    $('questionCard').inert=false;
     const feedback=$('feedbackPanel');
     feedback.className='feedback hidden';
     $('feedbackHeading').textContent='';
@@ -2411,7 +3215,13 @@
     $('feedbackPart').classList.add('hidden');
     $('feedbackDefinition').textContent='';
     $('feedbackExample').textContent='';
+    $('feedbackExample').removeAttribute('aria-label');
+    $('feedbackDefinition').removeAttribute('aria-label');
+    $('feedbackWord').removeAttribute('aria-label');
     $('feedbackExampleLabel').textContent='Example sentence';
+    $('feedbackOtherMeanings').classList.add('hidden');
+    $('feedbackOtherMeanings').open=false;
+    $('feedbackOtherMeaningList').replaceChildren();
     $('feedbackReviewNote').textContent='';
     $('feedbackReviewNote').classList.add('hidden');
     $('wordFacts').innerHTML='';
@@ -2445,6 +3255,33 @@
     });
     $('questionPrompt').focus();
     void prefetchSessionDictionary((session?.index || 0) + 1);
+  }
+
+  function renderAlternateMeanings(target) {
+    const section=$('feedbackOtherMeanings');
+    const list=$('feedbackOtherMeaningList');
+    list.replaceChildren();
+    const meanings=Array.isArray(target.alternateMeanings) ? target.alternateMeanings : [];
+    for (const meaning of meanings) {
+      const li=document.createElement('li');
+      const definition=document.createElement('p');
+      definition.className='other-meaning-definition';
+      definition.textContent=meaning.definition;
+      li.appendChild(definition);
+      if (meaning.example) {
+        const example=document.createElement('p');
+        example.className='other-meaning-example';
+        example.textContent=meaning.example;
+        li.appendChild(example);
+      }
+      list.appendChild(li);
+    }
+    section.classList.toggle('hidden',!meanings.length);
+    section.open=false;
+    const distinct=Boolean(MEANING_GUIDES[String(target.word || '').toLowerCase()]?.length);
+    $('feedbackOtherMeaningsLabel').textContent=distinct
+      ? (meanings.length===1 ? 'This word also has another meaning — explore' : `This word has ${meanings.length} other meanings — explore`)
+      : `Other dictionary definitions (${meanings.length}) — explore`;
   }
 
   function renderOfficialDefinitions(target) {
@@ -2501,6 +3338,10 @@
     // Replace the question immediately. Hidden answer controls cannot leak stale labels to TalkBack.
     $('questionCard').classList.add('hidden');
     $('questionCard').setAttribute('aria-hidden','true');
+    $('questionCard').inert=true;
+    $('answerChoices').replaceChildren();
+    // Clear unrelated previous announcements before moving TalkBack focus.
+    $('screenAnnouncer').textContent='';
 
     session.answered+=1;
     if (isCorrect) session.correct+=1;
@@ -2528,23 +3369,28 @@
     const panel=$('feedbackPanel');
     const primaryDefinition=q.target.answerDefinition || q.target.quizDefinition || q.target.definition;
     panel.className=`feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
-    $('feedbackHeading').textContent=isCorrect ? 'Correct' : 'Not quite';
+    $('feedbackHeading').textContent=isCorrect ? 'Correct answer' : 'Answer to review';
     $('feedbackWord').textContent=q.item.word;
+    $('feedbackWord').setAttribute('aria-label',q.target.partOfSpeech ? `${q.item.word}, ${q.target.partOfSpeech}` : q.item.word);
     $('feedbackPart').textContent=q.target.partOfSpeech || '';
     $('feedbackPart').classList.toggle('hidden', !q.target.partOfSpeech);
     $('feedbackDefinition').textContent=primaryDefinition;
+    $('feedbackDefinition').setAttribute('aria-label',`Meaning. ${primaryDefinition}`);
     const illustration=String(q.target.example || q.target.examples?.[0] || '').trim();
     const hasSentence=looksLikeSentence(illustration);
     $('feedbackExampleLabel').textContent=illustration
       ? (hasSentence ? 'Example sentence' : 'Usage example')
       : 'Example';
-    $('feedbackExample').textContent=illustration || 'No example available for this meaning.';
+    $('feedbackExample').textContent=illustration || 'This question was skipped because no suitable example was available.';
+    $('feedbackExample').setAttribute('aria-label',`Example sentence. ${illustration || 'Not available'}`);
+    renderAlternateMeanings(q.target);
     $('feedbackReviewNote').textContent=!isCorrect && !isPlacement ? 'This word will return later for review.' : '';
     $('feedbackReviewNote').classList.toggle('hidden',isCorrect || isPlacement);
     playAnswerSound(isCorrect);
     $('wordFacts').innerHTML='';
     addFact('Source','Merriam-Webster Collegiate Dictionary');
-    renderOfficialDefinitions(q.target);
+    // Alternate meanings have a dedicated disclosure in the main reading path.
+    $('officialDefinitions').classList.add('hidden');
     if (isPlacement) {
       addFact('Placement','Does not change study progress');
       $('detailsButton').classList.add('hidden');
