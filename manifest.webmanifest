@@ -1,7 +1,7 @@
 {
   "name": "Vocabulary Builder",
   "short_name": "Vocab Builder",
-  "description": "Accessible vocabulary practice with persistent progress tracking.",
+  "description": "Accessible level-based vocabulary practice with persistent progress tracking.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f2f7",

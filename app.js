@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '0.9';
+  const APP_VERSION = '1.0';
   const LEVEL_NAMES = {1:'Common',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -54,8 +54,8 @@
   let pendingUpdateReload = false;
   let updateReloading = false;
   const VIEW_TITLES = {
-    home:'Vocabulary Builder', practice:'Custom practice', lookup:'Dictionary', word:'Word details', words:'Vocabulary library',
-    collections:'Collections', history:'Word history', stats:'Progress', settings:'Settings', about:'About'
+    home:'Vocabulary Builder', practice:'Practice', lookup:'Find a word', word:'Word details', words:'Browse all words',
+    collections:'Browse topic groups', history:'Recent words', stats:'Your progress', settings:'App settings', about:'About this app'
   };
 
   function defaultProgress() {
@@ -410,8 +410,29 @@
     updateAppBar();
   }
 
-  function appHistoryState(view=currentView, overlay=null) {
-    return {vocabBuilder:true, view, overlay};
+  function appHistoryState(view=currentView, overlay=null, extra={}) {
+    return {vocabBuilder:true, view, overlay, ...extra};
+  }
+
+  function announceScreen(message) {
+    const live=$('screenAnnouncer');
+    if (!live) return;
+    live.textContent='';
+    setTimeout(()=>{ live.textContent=String(message || ''); },30);
+  }
+
+  function practiceLabel() {
+    if (!session) return 'Practice';
+    if (session.mode==='level' && session.levels?.length) {
+      const level=session.levels[0];
+      return `Level ${level}: ${LEVEL_NAMES[level]}`;
+    }
+    if (session.mode==='placement') return 'Placement check';
+    if (session.mode==='discover') return 'Unseen words';
+    if (session.mode==='quick') return 'Mixed review';
+    if (session.mode==='missed-review') return 'Missed-word review';
+    if (session.mode==='single') return 'Practice one word';
+    return 'Custom practice';
   }
 
   function updateAppBar() {
@@ -422,11 +443,11 @@
     if (!title || !back || !menu || !end) return;
     let label=VIEW_TITLES[currentView] || 'Vocabulary Builder';
     if (currentView==='practice') {
-      if (practicePhase==='round' && session) label = session.mode==='placement'
-        ? `Placement ${Math.min(session.index+1,session.queue.length)} of ${session.queue.length}`
-        : `Round ${Math.min(session.index+1,session.queue.length)} of ${session.queue.length}`;
-      else if (practicePhase==='complete') label = 'Round complete';
-      else label = 'Custom Practice';
+      if (practicePhase==='round' && session) {
+        const position=Math.min(session.index+1,session.queue.length);
+        label=`${practiceLabel()} · ${position} of ${session.queue.length}`;
+      } else if (practicePhase==='complete') label='Round complete';
+      else label='Build a custom round';
     }
     title.textContent=label;
     back.classList.toggle('hidden', currentView==='home');
@@ -457,9 +478,7 @@
   function switchView(name, focus=true, historyMode='push') {
     const view=$(`view-${name}`);
     if (!view) return;
-    if (history.state?.overlay==='menu' && historyMode==='push') {
-      history.replaceState(appHistoryState(currentView), '', `#${currentView}`);
-    }
+    if (history.state?.overlay==='menu' && historyMode==='push') history.replaceState(appHistoryState(currentView),'',`#${currentView}`);
     if (historyMode==='push' && name!==currentView) history.pushState(appHistoryState(name),'',`#${name}`);
     if (historyMode==='replace') history.replaceState(appHistoryState(name),'',`#${name}`);
     currentView=name;
@@ -479,30 +498,47 @@
     if (name === 'practice' && session) { practicePhase='round'; setFocusedPracticeActive(true); }
     else if (name !== 'practice') setFocusedPracticeActive(false);
     updateAppBar();
-    if (focus) { const heading=view.querySelector('h2'); (heading || $('main')).focus?.(); }
+    if (focus) {
+      const heading=view.querySelector('h2');
+      requestAnimationFrame(()=> (heading || $('main')).focus?.());
+    }
   }
 
   function navigateBack() {
     if (!$('mainMenu').classList.contains('hidden')) { setMenuOpen(false,false,'auto'); return; }
     const openDisclosure=qs(`#view-${currentView} details[open]`);
     if (openDisclosure) { openDisclosure.open=false; return; }
-    if (currentView==='home') return;
+    if (currentView==='home') {
+      announceScreen('Practice by level. Home screen. Use Menu to navigate.');
+      showToast('Home — use Menu to navigate.');
+      return;
+    }
     history.back();
   }
 
+  function restoreHomeGuard() {
+    currentView='home';
+    switchView('home',false,'none');
+    history.pushState(appHistoryState('home'),'','#home');
+    requestAnimationFrame(()=> $('homeHeading')?.focus?.());
+    announceScreen('Practice by level. Home screen. Use Menu to navigate.');
+  }
+
   function handlePopState(event) {
-    if (!$('mainMenu').classList.contains('hidden') && event.state?.overlay!=='menu') {
-      setMenuOpen(false,false,'none');
+    if (!event.state?.vocabBuilder || event.state?.guard) {
+      restoreHomeGuard();
       return;
     }
+    if (!$('mainMenu').classList.contains('hidden') && event.state?.overlay!=='menu') {
+      setMenuOpen(false,false,'none');
+    }
     const openDisclosure=qs(`#view-${currentView} details[open]`);
-    if (openDisclosure && event.state?.vocabBuilder && !event.state?.overlay) {
+    if (openDisclosure && !event.state?.overlay) {
       suppressDisclosureHistory=true;
       openDisclosure.open=false;
       suppressDisclosureHistory=false;
       return;
     }
-    if (!event.state?.vocabBuilder) return;
     if (event.state.overlay==='menu') {
       currentView=event.state.view || currentView;
       setMenuOpen(true,true,'none');
@@ -521,8 +557,7 @@
       void openWordDetail(event.state.word,{historyMode:'none'});
       return;
     }
-    if (targetView===currentView) { updateAppBar(); return; }
-    switchView(targetView, true, 'none');
+    switchView(targetView,true,'none');
   }
 
   function wireBackAwareDisclosures() {
@@ -552,54 +587,41 @@
     const studyItems = allStudyWords();
     const activeItems = studyItems.filter(({word}) => !getExistingWordState(word).suspended && !isInvalidSeed(word));
     const states = studyItems.map(({word}) => getExistingWordState(word));
-    const seen = states.filter(s => s.seen>0);
-    const mastered = states.filter(s => s.mastery===4).length;
-    const learning = states.filter(s => s.mastery>0 && s.mastery<4).length;
-    const due = activeItems.filter(({word}) => {
-      const st = getExistingWordState(word);
-      return st.nextDue && st.nextDue <= Date.now();
-    }).length;
-    const difficult = activeItems.filter(({word}) => {
-      const st = getExistingWordState(word);
-      return st.wrong>0 && (st.correct+st.wrong) && st.correct/(st.correct+st.wrong)<0.7;
-    }).length;
-    const personalCount = studyItems.filter(item => isSavedWord(item.word)).length;
-    const accuracyText=accuracy(progress.totals.correct, progress.totals.answers);
+    const seen = states.filter(state => state.seen>0);
+    const mastered = states.filter(state => state.mastery===4).length;
+    const due = activeItems.filter(({word}) => { const state=getExistingWordState(word); return state.nextDue && state.nextDue<=Date.now(); }).length;
+    const difficult = activeItems.filter(({word}) => { const state=getExistingWordState(word); return state.wrong>0 && (state.correct+state.wrong) && state.correct/(state.correct+state.wrong)<0.7; }).length;
+    const savedCount=studyItems.filter(item=>isSavedWord(item.word)).length;
     const streak=progress.streak?.current || 0;
 
     $('homeProgressSummary').textContent = seen.length
-      ? `${seen.length.toLocaleString()} words encountered. ${mastered.toLocaleString()} mastered. Accuracy ${accuracyText}. ${streak}-day study streak.`
-      : 'No study activity yet. Start a round when you are ready.';
-    $('homeSavedWordsButton').textContent=`Saved words (${personalCount.toLocaleString()})`;
-    $('reviewDueButton').textContent=`Due reviews: ${due}`;
-    $('reviewMissedButton').textContent=`Difficult words: ${difficult}`;
+      ? `${seen.length.toLocaleString()} words studied. ${mastered.toLocaleString()} mastered. Accuracy ${accuracy(progress.totals.correct,progress.totals.answers)}. ${streak}-day streak.`
+      : 'No study activity yet. Choose a level to begin.';
+    $('homeSavedWordsButton').textContent=`Review saved words (${savedCount.toLocaleString()})`;
+    $('reviewDueButton').textContent=`Review due words (${due})`;
+    $('reviewMissedButton').textContent=`Practice difficult words (${difficult})`;
     $('reviewDueButton').classList.toggle('hidden', due===0);
     $('reviewMissedButton').classList.toggle('hidden', difficult===0);
     $('homeReviewPanel').classList.toggle('hidden', due===0 && difficult===0);
 
-    const ready = Boolean(keys.dictionary && keys.thesaurus);
+    const ready=Boolean(keys.dictionary);
     $('setupNotice').classList.toggle('hidden', ready);
-    if (!ready) $('setupNoticeText').textContent = 'Dictionary setup is needed before practice.';
+    if (!ready) $('setupNoticeText').textContent='Dictionary setup is needed before practice.';
+    $('resumeSessionButton').classList.toggle('hidden', !hasResumableSession());
 
-    const resumable = hasResumableSession();
-    $('resumeSessionButton').classList.toggle('hidden', !resumable);
-    $('startPracticeButton').disabled = !ready || resumable;
-    $('homeDiscoverButton').disabled = !ready || resumable;
-    $('reviewDueButton').disabled = !ready || due===0 || resumable;
-    $('reviewMissedButton').disabled = !ready || difficult===0 || resumable;
     for (let level=1; level<=5; level++) {
       const levelItems=studyItems.filter(item=>item.level===level && !item.custom);
-      const encountered=levelItems.filter(item=>getExistingWordState(item.word).seen>0).length;
+      const studied=levelItems.filter(item=>getExistingWordState(item.word).seen>0).length;
       const masteredLevel=levelItems.filter(item=>getExistingWordState(item.word).mastery===4).length;
       const total=levelItems.length || 1;
-      const text=`${encountered.toLocaleString()} of ${levelItems.length.toLocaleString()} encountered; ${masteredLevel.toLocaleString()} mastered`;
+      const text=studied ? `${studied.toLocaleString()} studied · ${masteredLevel.toLocaleString()} mastered` : 'Not started';
       const progressEl=$(`homeLevel${level}Progress`);
       const barEl=$(`homeLevel${level}Bar`);
       if (progressEl) progressEl.textContent=text;
-      if (barEl) barEl.style.width=`${Math.min(100,Math.round(encountered/total*100))}%`;
+      if (barEl) barEl.style.width=`${Math.min(100,Math.round(masteredLevel/total*100))}%`;
+      const button=qs(`[data-home-level="${level}"]`);
+      if (button) button.setAttribute('aria-label',`Start Level ${level}, ${LEVEL_NAMES[level]}. ${text}.`);
     }
-    qsa('[data-home-level]').forEach(button => { button.disabled = !ready || resumable; });
-
   }
 
   function renderPracticeSetup() {
@@ -609,6 +631,7 @@
     $('sessionComplete').classList.add('hidden');
     $('endSessionButton').classList.add('hidden');
     $('placementApplyButton').classList.add('hidden');
+    $('nextLevelButton').classList.add('hidden');
     $('anotherSessionButton').classList.remove('hidden');
     $('anotherSessionButton').textContent = 'Continue';
     $('reviewRoundButton').classList.add('hidden');
@@ -750,11 +773,6 @@
 
   async function beginLevelSession(level) {
     if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
-    if (!session && loadSavedSession()) {
-      showToast('Resume or end your unfinished round before starting a new round.');
-      switchView('home');
-      return;
-    }
     const built=buildLevelSession(Number(level));
     if (!built) { showToast('No words are available in this level.'); return; }
     switchView('practice',false);
@@ -798,11 +816,6 @@
 
   async function beginQuickSession(kind='quick') {
     if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
-    if (!session && loadSavedSession()) {
-      showToast('Resume or end your unfinished round before starting a new one.');
-      switchView('home');
-      return;
-    }
     const built=buildQuickSession(kind);
     if (!built) {
       showToast(kind==='discover' ? 'No unseen curriculum words are currently available.' : 'No words are available for a quick round.');
@@ -814,6 +827,10 @@
 
   function startBuiltSession(built) {
     if (!built) return;
+    const replacing=Boolean(session || loadSavedSession());
+    session=null;
+    clearSavedSession();
+    if (replacing) showToast('Started a new round. Your completed answers were kept.');
     session = {...built, resumeIndex:built.index || 0, missedWords:Array.isArray(built.missedWords)?built.missedWords:[]};
     practicePhase='round';
     persistSession();
@@ -827,11 +844,6 @@
 
   async function beginSession(mode='normal') {
     if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
-    if (!session && loadSavedSession()) {
-      showToast('Resume or end your unfinished round before starting a new one.');
-      switchView('home');
-      return;
-    }
     const built = buildSession(mode);
     if (!built) return;
     startBuiltSession(built);
@@ -1106,17 +1118,14 @@
 
     const save=$('wordSaveButton');
     save.classList.toggle('hidden', saved);
-    save.disabled=false;
     save.textContent='Save word';
     const practice=$('wordPracticeButton');
-    const roundActive=hasResumableSession();
-    practice.disabled=roundActive;
-    practice.textContent=roundActive ? 'Practice after current round' : 'Practice word';
+    practice.classList.remove('hidden');
+    practice.textContent='Practice word';
 
     const known=$('wordKnownButton');
     const alreadyKnown=Boolean(state.markedKnown && state.mastery===4);
     known.classList.toggle('hidden', alreadyKnown);
-    known.disabled=false;
     known.textContent='Mark as known';
     $('wordSuspendButton').textContent=state.suspended ? 'Resume review' : 'Pause review';
 
@@ -1145,7 +1154,6 @@
     $('wordDetailWord').textContent=entry?.headword || normalized;
     $('wordRelatedPanel').classList.add('hidden');
     $('wordRelatedPanel').innerHTML='';
-    $('wordRelatedButton').disabled=false;
     $('wordRelatedButton').textContent='Show synonyms and antonyms';
     $('wordDetailContent').classList.add('hidden');
     $('wordDetailLoading').classList.remove('hidden');
@@ -1178,15 +1186,15 @@
       panel.textContent='Related-word access is not configured. Add the Merriam-Webster Thesaurus key in Settings.';
       panel.classList.remove('hidden'); return;
     }
-    button.disabled=true; button.textContent='Loading synonyms and antonyms…';
+    button.classList.add('hidden');
     panel.classList.remove('hidden'); panel.textContent='Loading synonyms and antonyms…';
     try {
       const thesaurus=await getThesaurus(currentWordDetail.word);
       renderThesaurusWithAdd(panel,thesaurus);
-      button.textContent='Synonyms and antonyms shown';
+      button.classList.add('hidden');
     } catch(error) {
       panel.textContent=`Synonyms and antonyms unavailable: ${error.message}`;
-      button.disabled=false; button.textContent='Try synonyms and antonyms again';
+      button.classList.remove('hidden'); button.textContent='Try synonyms and antonyms again';
     }
   }
 
@@ -1206,10 +1214,6 @@
 
   function practiceWordNow(word, level=3) {
     if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
-    if (hasResumableSession()) {
-      showToast('Resume or end your unfinished round before starting one-word practice.');
-      return;
-    }
     const item = ensureStudyWord(word, level);
     if (!item) return;
     const state = wordState(item.word);
@@ -1331,7 +1335,7 @@
     if (!word) { status.textContent='Enter a word to look up.'; input.focus(); return; }
     if (!keys.dictionary) { status.textContent='Dictionary access is not configured. Open Settings first.'; return; }
     status.textContent=`Looking up ${raw}…`;
-    $('lookupButton').disabled=true;
+    $('lookupButton').classList.add('hidden');
     try {
       const data=await apiLookup('dictionary',word,keys.dictionary);
       if (!Array.isArray(data)) throw new Error('Unexpected dictionary response.');
@@ -1354,7 +1358,7 @@
     } catch(error) {
       status.textContent=`Lookup failed: ${error.message}`;
     } finally {
-      $('lookupButton').disabled=false;
+      $('lookupButton').classList.remove('hidden');
     }
   }
 
@@ -1440,7 +1444,6 @@
     $('feedbackPanel').classList.add('hidden');
     $('detailsPanel').classList.add('hidden');
     $('luckyGuessButton').classList.add('hidden');
-    $('luckyGuessButton').disabled = false;
     $('luckyGuessButton').textContent = 'Lucky guess — review sooner';
     $('confidenceStatus').classList.add('hidden');
     $('confidenceStatus').textContent = '';
@@ -1485,6 +1488,7 @@
   function renderQuestion(q) {
     $('loadingQuestion').classList.add('hidden');
     $('questionCard').classList.remove('hidden');
+    $('questionCard').removeAttribute('aria-hidden');
     const feedback=$('feedbackPanel');
     feedback.className='feedback hidden';
     $('feedbackHeading').textContent='';
@@ -1540,93 +1544,71 @@
 
   function answerQuestion(option, button) {
     if (!session?.current || session.current.answered) return;
-    session.current.answered = true;
-    const q = session.current;
-    const isCorrect = option.correct === true;
-    const isPlacement = session.mode === 'placement';
-    session.answered += 1;
-    if (isCorrect) session.correct += 1;
+    session.current.answered=true;
+    const q=session.current;
+    const isCorrect=option.correct===true;
+    const isPlacement=session.mode==='placement';
 
+    // Replace the question immediately. Hidden answer controls cannot leak stale labels to TalkBack.
+    $('questionCard').classList.add('hidden');
+    $('questionCard').setAttribute('aria-hidden','true');
+
+    session.answered+=1;
+    if (isCorrect) session.correct+=1;
     if (isPlacement) {
-      const levelResult = session.placementResults[q.item.level];
-      levelResult.answered += 1;
-      if (isCorrect) levelResult.correct += 1;
+      const levelResult=session.placementResults[q.item.level];
+      levelResult.answered+=1;
+      if (isCorrect) levelResult.correct+=1;
     } else {
-      q.progressBefore = {...getExistingWordState(q.item.word)};
-      q.wasCorrect = isCorrect;
-      updateWordProgress(q.item.word, isCorrect);
+      q.progressBefore={...getExistingWordState(q.item.word)};
+      q.wasCorrect=isCorrect;
+      updateWordProgress(q.item.word,isCorrect);
     }
-
-    qsa('.answer-button').forEach(answerButton => {
-      answerButton.disabled = true;
-      const correct = answerButton.dataset.correct === 'true';
-      const selected = answerButton === button;
-      const labels=[];
-      if (correct) labels.push('correct answer');
-      if (selected) labels.push('your answer');
-      if (selected && !correct) labels.push('not correct');
-      answerButton.textContent = `${answerButton.dataset.baseText}${labels.length ? ` — ${labels.join(', ')}` : ''}`;
-      answerButton.setAttribute('aria-label', `${answerButton.dataset.baseText}${labels.length ? `. ${labels.join('. ')}.` : ''}`);
-      if (correct) answerButton.classList.add('correct-answer');
-      if (selected && !correct) answerButton.classList.add('wrong-answer');
-    });
 
     if (!isCorrect && !isPlacement) {
       if (!Array.isArray(session.missedWords)) session.missedWords=[];
       if (!session.missedWords.includes(q.item.word)) session.missedWords.push(q.item.word);
-      const repeatExists = session.queue.slice(session.index+1).some(entry => entry.word===q.item.word && entry.repeat);
+      const repeatExists=session.queue.slice(session.index+1).some(entry=>entry.word===q.item.word && entry.repeat);
       if (!repeatExists) {
-        const insertAt = Math.min(session.queue.length, session.index + 5);
-        session.queue.splice(insertAt, 0, {...q.item, repeat:true});
-        showToast(`${q.item.word} will return later for review.`);
+        const insertAt=Math.min(session.queue.length,session.index+4);
+        session.queue.splice(insertAt,0,{...q.item,repeat:true});
       }
     }
 
-    const state = getExistingWordState(q.item.word);
-    const panel = $('feedbackPanel');
+    const state=getExistingWordState(q.item.word);
+    const panel=$('feedbackPanel');
     const primaryDefinition=q.target.answerDefinition || q.target.definition;
-    panel.className = `feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
-    $('feedbackHeading').textContent = isCorrect ? 'Correct' : 'Not quite';
-    if (isPlacement) {
-      $('feedbackText').textContent = isCorrect
-        ? `${q.item.word}: ${primaryDefinition}`
-        : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}.`;
-    } else {
-      $('feedbackText').textContent = isCorrect
-        ? `${q.item.word}: ${primaryDefinition}`
-        : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}. This word will return later.`;
-    }
-    $('wordFacts').innerHTML = '';
-    if (q.target.partOfSpeech) addFact('Part of speech', q.target.partOfSpeech);
-    addFact('Source', "Merriam-Webster Collegiate Dictionary");
+    panel.className=`feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
+    $('feedbackHeading').textContent=isCorrect ? 'Correct' : 'Not quite';
+    $('feedbackText').textContent=isCorrect
+      ? `${q.item.word}: ${primaryDefinition}`
+      : `Correct answer: ${q.direction==='word-def' ? primaryDefinition : q.item.word}. ${isPlacement ? '' : 'This word will return later.'}`.trim();
+    $('wordFacts').innerHTML='';
+    if (q.target.partOfSpeech) addFact('Part of speech',q.target.partOfSpeech);
+    addFact('Source','Merriam-Webster Collegiate Dictionary');
     renderOfficialDefinitions(q.target);
     if (isPlacement) {
-      addFact('Placement', 'Does not change study progress');
+      addFact('Placement','Does not change study progress');
       $('detailsButton').classList.add('hidden');
+      $('feedbackSaveButton').classList.add('hidden');
+      $('feedbackOpenWordButton').classList.add('hidden');
+      $('luckyGuessButton').classList.add('hidden');
     } else {
-      addFact('Mastery', statusOf(state));
+      addFact('Mastery',statusOf(state));
       $('detailsButton').classList.remove('hidden');
-      $('luckyGuessButton').classList.toggle('hidden', !isCorrect);
-      $('detailsButton').textContent = 'Synonyms and antonyms';
-      $('detailsButton').disabled = false;
-      const saved=isSavedWord(q.item.word);
-      $('feedbackSaveButton').classList.toggle('hidden', saved);
-      $('feedbackSaveButton').disabled=false;
+      $('luckyGuessButton').classList.toggle('hidden',!isCorrect);
+      $('detailsButton').textContent='Show synonyms and antonyms';
+      $('feedbackSaveButton').classList.toggle('hidden',isSavedWord(q.item.word));
       $('feedbackSaveButton').textContent='Save word';
       $('feedbackOpenWordButton').classList.remove('hidden');
     }
-    if (isPlacement) {
-      $('feedbackSaveButton').classList.add('hidden');
-      $('feedbackOpenWordButton').classList.add('hidden');
-    }
-    $('nextQuestionButton').textContent = 'Next word';
-    $('nextQuestionButton').onclick = nextQuestion;
+    $('nextQuestionButton').textContent='Next word';
+    $('nextQuestionButton').onclick=nextQuestion;
     updateQuestionCounter();
-    session.resumeIndex = session.index + 1;
+    session.resumeIndex=session.index+1;
     persistSession();
-    $('questionCard').classList.add('hidden');
     panel.classList.remove('hidden');
-    requestAnimationFrame(() => $('feedbackHeading').focus());
+    requestAnimationFrame(()=> $('feedbackHeading').focus());
     if (!isPlacement) renderHome();
   }
 
@@ -1655,8 +1637,7 @@
     state.luckyGuesses = (Number(state.luckyGuesses) || 0) + 1;
     q.luckyGuessMarked = true;
     saveState();
-    $('luckyGuessButton').disabled = true;
-    $('luckyGuessButton').textContent = 'Lucky guess recorded';
+    $('luckyGuessButton').classList.add('hidden');
     $('confidenceStatus').textContent = 'The answer stays correct in your accuracy statistics, but this word did not gain mastery and will be reviewed sooner.';
     $('confidenceStatus').classList.remove('hidden');
     renderHome(); renderWords(); renderStats();
@@ -1674,8 +1655,7 @@
     if (!session?.current || session.mode === 'placement') return;
     const q = session.current;
     const button = $('detailsButton');
-    button.disabled = true;
-    button.textContent = 'Loading thesaurus…';
+    button.classList.add('hidden');
     const panel = $('detailsPanel');
     panel.classList.remove('hidden');
     panel.textContent = 'Loading official thesaurus information…';
@@ -1686,11 +1666,11 @@
       appendThesaurusWordGroup(panel, 'Synonyms', t.synonyms, () => q.item.level || 3);
       appendThesaurusWordGroup(panel, 'Antonyms', t.antonyms, () => q.item.level || 3);
       if (!t.synonyms.length && !t.antonyms.length) panel.append('No synonym or antonym list was returned for this word.');
-      button.textContent = 'Synonyms and antonyms shown';
+      button.classList.add('hidden');
     } catch (e) {
       panel.textContent = `Thesaurus lookup failed: ${e.message}`;
+      button.classList.remove('hidden');
       button.textContent = 'Try synonyms and antonyms again';
-      button.disabled = false;
     }
   }
 
@@ -1733,6 +1713,7 @@
     $('sessionSummary').textContent = `Placement complete. ${scoreText.join('; ')}. Recommended starting point: Level ${recommendedLevel}: ${LEVEL_NAMES[recommendedLevel]}. This quick estimate did not change mastery or study statistics.`;
     practicePhase='complete';
     $('anotherSessionButton').classList.add('hidden');
+    $('nextLevelButton').classList.add('hidden');
     $('reviewRoundButton').classList.add('hidden');
     $('sessionHomeButton').classList.remove('hidden');
     $('placementApplyButton').classList.remove('hidden');
@@ -1746,12 +1727,9 @@
   }
 
   function applyPlacementRecommendation() {
-    const level = Number(progress.placement?.recommendedLevel);
+    const level=Number(progress.placement?.recommendedLevel);
     if (!level) return;
-    settings = {...settings, levels:[level], source:'all', collection:'all', novelty:'balanced'};
-    saveState();
-    renderPracticeSetup();
-    showToast(`Practice set to Level ${level}: ${LEVEL_NAMES[level]}.`);
+    beginLevelSession(level);
   }
 
   function finishSession() {
@@ -1774,7 +1752,15 @@
     $('sessionComplete').classList.remove('hidden');
     $('placementApplyButton').classList.add('hidden');
     $('anotherSessionButton').classList.remove('hidden');
-    $('anotherSessionButton').textContent='Another round like this';
+    const completedLevel=summary.mode==='level' && summary.levels?.length ? summary.levels[0] : null;
+    $('anotherSessionButton').textContent=completedLevel ? `Practice Level ${completedLevel} again` : 'Another round like this';
+    const nextLevel=$('nextLevelButton');
+    if (nextLevel) {
+      const showNext=Boolean(completedLevel && completedLevel<5);
+      nextLevel.classList.toggle('hidden',!showNext);
+      if (showNext) nextLevel.textContent=`Practice Level ${completedLevel+1}: ${LEVEL_NAMES[completedLevel+1]}`;
+      nextLevel.dataset.level=showNext ? String(completedLevel+1) : '';
+    }
     $('reviewRoundButton').classList.toggle('hidden', lastCompletedRound.missedWords.length===0);
     $('sessionHomeButton').classList.remove('hidden');
     const recycled = Math.max(0, summary.queue.length - summary.plannedCount);
@@ -1834,6 +1820,11 @@
     startBuiltSession(built);
   }
 
+  function practiceNextLevel() {
+    const level=Number($('nextLevelButton')?.dataset.level || 0);
+    if (level>=1 && level<=5) beginLevelSession(level);
+  }
+
   function goHomeFromComplete() {
     switchView('home',true,'replace');
   }
@@ -1874,7 +1865,7 @@
       const row=document.createElement('div'); row.className='action-row';
       const practice=document.createElement('button'); practice.type='button'; practice.textContent=`Practice ${collection.name}`;
       practice.addEventListener('click',()=>{
-        settings={...settings,source:'starter',collection:collection.id,levels:[1,2,3,4,5]}; saveState(); switchView('practice');
+        settings={...settings,source:'starter',collection:collection.id,levels:[1,2,3,4,5],sessionSize:10}; saveState(); switchView('practice'); beginSession('normal');
       });
       const browse=document.createElement('button'); browse.type='button'; browse.textContent=`Browse ${collection.name}`;
       browse.addEventListener('click',()=>openLibraryWith({source:'starter',collection:collection.id}));
@@ -1904,7 +1895,7 @@
     const availability = $('availabilityFilter')?.value || 'all';
     const collection = $('collectionFilter')?.value || 'all';
     if (currentView==='words') {
-      const title = source==='personal' ? 'Saved words' : (collection!=='all' ? collectionName(collection) : 'Vocabulary library');
+      const title = source==='personal' ? 'Review saved words' : (collection!=='all' ? `Browse ${collectionName(collection)}` : 'Browse all words');
       $('wordsHeading').textContent=title;
       $('appBarTitle').textContent=title;
       $('menuSavedWordsButton')?.setAttribute('aria-current', source==='personal' ? 'page' : 'false');
@@ -1927,8 +1918,8 @@
     $('libraryPracticeButton').classList.toggle('hidden', source!=='personal' || items.length===0);
     const list = $('wordList'); list.innerHTML='';
     shown.forEach(item=>list.appendChild(createWordListItem(item)));
-    $('wordPrevButton').disabled=wordPage===0;
-    $('wordNextButton').disabled=wordPage>=pages-1 || !items.length;
+    $('wordPrevButton').classList.toggle('hidden',wordPage===0 || !items.length);
+    $('wordNextButton').classList.toggle('hidden',wordPage>=pages-1 || !items.length);
     $('wordPageStatus').textContent=items.length ? `Page ${wordPage+1} of ${pages}` : 'No pages';
   }
 
@@ -1982,7 +1973,7 @@
   async function testKeys() {
     saveKeysFromForm();
     if (!keys.dictionary || !keys.thesaurus) return;
-    const button=$('testKeysButton');button.disabled=true;
+    const button=$('testKeysButton');button.classList.add('hidden');
     $('keyStatus').textContent='Testing both keys…';
     try {
       const [d,t]=await Promise.all([
@@ -1995,7 +1986,7 @@
       $('keyStatus').textContent='Success. Both Merriam-Webster keys returned usable results.';
     } catch(e) {
       $('keyStatus').textContent=`Test failed: ${e.message}`;
-    } finally { button.disabled=false; }
+    } finally { button.classList.remove('hidden'); }
   }
 
   function exportProgress() {
@@ -2037,7 +2028,6 @@
 
   function practiceSavedWords() {
     if (!keys.dictionary) { switchView('settings'); return; }
-    if (hasResumableSession()) { showToast('Resume or end your unfinished round first.'); return; }
     settings={...settings,source:'personal',collection:'all',levels:[1,2,3,4,5],sessionSize:10};
     saveState();
     switchView('practice');
@@ -2071,6 +2061,7 @@
     $('beginSessionButton').addEventListener('click',()=>beginSession('normal'));
     $('endSessionButton').addEventListener('click',endSession);
     $('anotherSessionButton').addEventListener('click',continueLastRound);
+    $('nextLevelButton').addEventListener('click',practiceNextLevel);
     $('reviewRoundButton').addEventListener('click',reviewLastMissed);
     $('sessionHomeButton').addEventListener('click',goHomeFromComplete);
     $('placementApplyButton').addEventListener('click',applyPlacementRecommendation);
@@ -2147,7 +2138,8 @@
     wireBackAwareDisclosures();
     currentView='home';
     practicePhase='setup';
-    history.replaceState(appHistoryState('home'),'','#home');
+    history.replaceState(appHistoryState('home',null,{guard:true}),'','#home-guard');
+    history.pushState(appHistoryState('home'),'','#home');
     renderHome();
     updateAppBar();
     initServiceWorker();

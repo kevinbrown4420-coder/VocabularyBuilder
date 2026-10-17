@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#4b1f69">
-  <meta name="description" content="Accessible vocabulary practice with a broad 5,000-word curriculum, screened Merriam-Webster questions, collections, history, and persistent progress tracking.">
+  <meta name="description" content="Accessible level-based vocabulary practice with a 5,000-word curriculum, TalkBack-first navigation, and live Merriam-Webster reference data.">
   <title>Vocabulary Builder</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
@@ -22,61 +22,58 @@
     </div>
   </header>
 
-  <nav id="mainMenu" aria-label="Main navigation" class="main-menu hidden">
-    <button type="button" data-view="home" aria-current="page">Home</button>
-    <button type="button" data-view="lookup">Dictionary</button>
-    <button id="menuSavedWordsButton" type="button">Saved words</button>
-    <button type="button" data-view="collections">Collections</button>
-    <button type="button" data-view="words">Vocabulary library</button>
-    <button type="button" data-view="history">Word history</button>
-    <button type="button" data-view="stats">Progress</button>
-    <button type="button" data-view="settings">Settings</button>
-    <button type="button" data-view="about">About</button>
+  <div id="screenAnnouncer" class="sr-only" role="status" aria-live="assertive" aria-atomic="true"></div>
+
+  <nav id="mainMenu" aria-label="App menu" class="main-menu hidden">
+    <button type="button" data-view="home" aria-current="page">Practice by level</button>
+    <button type="button" data-view="lookup">Find a word</button>
+    <button id="menuSavedWordsButton" type="button">Review saved words</button>
+    <button type="button" data-view="collections">Browse topic groups</button>
+    <button type="button" data-view="words">Browse all words</button>
+    <button type="button" data-view="history">See recent words</button>
+    <button type="button" data-view="stats">Check progress</button>
+    <button type="button" data-view="settings">Change app settings</button>
+    <button type="button" data-view="about">About this app</button>
   </nav>
 
   <main id="main" tabindex="-1">
     <section id="view-home" class="view builder-home" aria-labelledby="homeHeading">
-      <h2 id="homeHeading" class="sr-only" tabindex="-1">Home</h2>
+      <h2 id="homeHeading" class="sr-only" tabindex="-1">Practice by level</h2>
       <section id="setupNotice" class="notice compact-notice hidden" aria-labelledby="setupNoticeText">
         <p id="setupNoticeText">Dictionary setup is needed before practice.</p>
         <button id="setupButton" type="button">Set up dictionary</button>
       </section>
 
-      <section class="home-hero" aria-labelledby="homeStudyHeading">
-        <h3 id="homeStudyHeading">Practice</h3>
-        <div class="home-practice-grid">
-          <button id="resumeSessionButton" class="home-action primary-action hidden" type="button"><span class="action-title">Resume</span><span class="action-subtitle">Continue your unfinished round</span></button>
-          <button id="startPracticeButton" class="home-action primary-action" type="button"><span class="action-title">Mixed practice</span><span class="action-subtitle">Review plus useful new words</span></button>
-          <button id="homeDiscoverButton" class="home-action" type="button"><span class="action-title">New words</span><span class="action-subtitle">A round of unseen vocabulary</span></button>
-        </div>
-      </section>
-
-      <section class="builder-panel" aria-labelledby="homeLevelsHeading">
-        <h3 id="homeLevelsHeading">Levels</h3>
-        <div class="level-stack">
-          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Common</span><span id="homeLevel1Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
-          <button class="level-row" type="button" data-home-level="2"><span class="level-title">Level 2 · Intermediate</span><span id="homeLevel2Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel2Bar" class="level-fill"></span></span></button>
-          <button class="level-row" type="button" data-home-level="3"><span class="level-title">Level 3 · Advanced</span><span id="homeLevel3Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel3Bar" class="level-fill"></span></span></button>
-          <button class="level-row" type="button" data-home-level="4"><span class="level-title">Level 4 · Expert</span><span id="homeLevel4Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel4Bar" class="level-fill"></span></span></button>
-          <button class="level-row" type="button" data-home-level="5"><span class="level-title">Level 5 · Challenge</span><span id="homeLevel5Progress" class="level-progress-text">0 encountered</span><span class="level-track" aria-hidden="true"><span id="homeLevel5Bar" class="level-fill"></span></span></button>
+      <section class="home-hero" aria-labelledby="homeLevelsHeading">
+        <h3 id="homeLevelsHeading">Choose a level</h3>
+        <p class="home-hero-intro">Tap a level and practice starts immediately.</p>
+        <button id="resumeSessionButton" class="resume-strip hidden" type="button">Resume unfinished round</button>
+        <div class="level-stack level-stack-primary">
+          <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Common</span><span id="homeLevel1Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="2"><span class="level-title">Level 2 · Intermediate</span><span id="homeLevel2Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel2Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="3"><span class="level-title">Level 3 · Advanced</span><span id="homeLevel3Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel3Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="4"><span class="level-title">Level 4 · Expert</span><span id="homeLevel4Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel4Bar" class="level-fill"></span></span></button>
+          <button class="level-row" type="button" data-home-level="5"><span class="level-title">Level 5 · Challenge</span><span id="homeLevel5Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel5Bar" class="level-fill"></span></span></button>
         </div>
       </section>
 
       <section id="homeReviewPanel" class="builder-panel hidden" aria-labelledby="homeReviewHeading">
-        <h3 id="homeReviewHeading">Review</h3>
+        <h3 id="homeReviewHeading">Review what needs work</h3>
         <div class="home-review-grid">
-          <button id="reviewDueButton" class="hidden" type="button">Due reviews: 0</button>
-          <button id="reviewMissedButton" class="hidden" type="button">Difficult words: 0</button>
+          <button id="reviewDueButton" class="hidden" type="button">Review due words</button>
+          <button id="reviewMissedButton" class="hidden" type="button">Practice difficult words</button>
         </div>
       </section>
 
-      <section class="builder-panel" aria-labelledby="homeExploreHeading">
-        <h3 id="homeExploreHeading">Explore</h3>
+      <section class="builder-panel" aria-labelledby="homeMoreHeading">
+        <h3 id="homeMoreHeading">More ways to study</h3>
         <div class="home-explore-grid">
-          <button id="homeLookupButton" type="button">Dictionary</button>
-          <button id="homeSavedWordsButton" type="button">Saved words</button>
-          <button id="homeCollectionsButton" type="button">Collections</button>
-          <button id="homeCustomButton" type="button">Custom practice</button>
+          <button id="startPracticeButton" type="button">Mixed review</button>
+          <button id="homeDiscoverButton" type="button">Learn unseen words</button>
+          <button id="homeCustomButton" type="button">Build a custom round</button>
+          <button id="homeSavedWordsButton" type="button">Review saved words</button>
+          <button id="homeLookupButton" type="button">Find a word</button>
+          <button id="homeCollectionsButton" type="button">Browse topic groups</button>
         </div>
       </section>
 
@@ -85,12 +82,12 @@
           <h3 id="homeProgressHeading">Your progress</h3>
           <p id="homeProgressSummary">No study activity yet.</p>
         </div>
-        <button id="homeProgressButton" type="button">View progress</button>
+        <button id="homeProgressButton" type="button">Check progress</button>
       </section>
     </section>
 
     <section id="view-practice" class="view hidden" aria-labelledby="practiceHeading">
-      <h2 id="practiceHeading" class="sr-only" tabindex="-1">Custom practice</h2>
+      <h2 id="practiceHeading" class="sr-only" tabindex="-1">Build a custom round</h2>
 
       <div id="practiceSetup">
         <fieldset>
@@ -176,15 +173,16 @@
         <p id="sessionSummary"></p>
         <div class="action-stack compact">
           <button id="placementApplyButton" class="primary hidden" type="button">Practice at recommended level</button>
-          <button id="anotherSessionButton" class="primary" type="button">Continue</button>
+          <button id="anotherSessionButton" class="primary" type="button">Practice this level again</button>
+          <button id="nextLevelButton" class="hidden" type="button">Practice next level</button>
           <button id="reviewRoundButton" class="hidden" type="button">Review missed words</button>
-          <button id="sessionHomeButton" type="button">Home</button>
+          <button id="sessionHomeButton" type="button">Choose another level</button>
         </div>
       </section>
     </section>
 
     <section id="view-lookup" class="view hidden" aria-labelledby="lookupHeading">
-      <h2 id="lookupHeading" class="sr-only" tabindex="-1">Dictionary</h2>
+      <h2 id="lookupHeading" class="sr-only" tabindex="-1">Find a word</h2>
       <p class="screen-intro">Look up a word, then save or practice it if useful.</p>
 
       <form id="lookupForm" class="lookup-form">
@@ -259,7 +257,7 @@
     </section>
 
     <section id="view-words" class="view hidden" aria-labelledby="wordsHeading">
-      <h2 id="wordsHeading" class="sr-only" tabindex="-1">Vocabulary library</h2>
+      <h2 id="wordsHeading" class="sr-only" tabindex="-1">Browse all words</h2>
       <div class="library-search">
         <label for="wordSearch">Search words</label>
         <input id="wordSearch" type="search" autocomplete="off">
@@ -313,13 +311,13 @@
     </section>
 
     <section id="view-collections" class="view hidden" aria-labelledby="collectionsHeading">
-      <h2 id="collectionsHeading" class="sr-only" tabindex="-1">Collections</h2>
+      <h2 id="collectionsHeading" class="sr-only" tabindex="-1">Browse topic groups</h2>
       <p class="screen-intro">Browse or practice related words by topic.</p>
       <div id="collectionList" class="collection-list"></div>
     </section>
 
     <section id="view-history" class="view hidden" aria-labelledby="historyHeading">
-      <h2 id="historyHeading" class="sr-only" tabindex="-1">Word history</h2>
+      <h2 id="historyHeading" class="sr-only" tabindex="-1">Recent words</h2>
       <p class="screen-intro">Recently encountered words, newest first.</p>
       <p id="historySummary" role="status" tabindex="-1"></p>
       <ul id="historyList" class="word-list"></ul>
@@ -327,14 +325,14 @@
     </section>
 
     <section id="view-stats" class="view hidden" aria-labelledby="statsHeading">
-      <h2 id="statsHeading" class="sr-only" tabindex="-1">Progress</h2>
+      <h2 id="statsHeading" class="sr-only" tabindex="-1">Your progress</h2>
       <ul id="overallStats" class="stats-list"></ul>
       <h3>By difficulty level</h3>
       <div id="levelStats"></div>
     </section>
 
     <section id="view-settings" class="view hidden" aria-labelledby="settingsHeading">
-      <h2 id="settingsHeading" class="sr-only" tabindex="-1">Settings</h2>
+      <h2 id="settingsHeading" class="sr-only" tabindex="-1">App settings</h2>
 
       <section class="builder-panel" aria-labelledby="appearanceHeading">
         <h3 id="appearanceHeading">Appearance</h3>
@@ -377,15 +375,15 @@
     </section>
 
     <section id="view-about" class="view hidden" aria-labelledby="aboutHeading">
-      <h2 id="aboutHeading" class="sr-only" tabindex="-1">About</h2>
+      <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 0.9</strong></p>
+        <p><strong>Version 1.0</strong></p>
         <p>Accessibility-first vocabulary practice with a 5,000-word curriculum and live Merriam-Webster reference data.</p>
       </section>
       <section class="builder-panel">
         <h3>Navigation</h3>
-        <p>Android Back returns to the previous app screen. During a round, leaving Practice keeps the unfinished round available from Home.</p>
+        <p>Android Back returns to the previous app screen and is trapped on Home so it does not intentionally exit the installed app. During a round, Back returns Home and keeps that round available to resume.</p>
       </section>
       <section class="builder-panel">
         <h3>Data and reference content</h3>
