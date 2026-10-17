@@ -21,7 +21,7 @@
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.4';
+  const APP_VERSION = '1.5';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -36,11 +36,12 @@
 
   let keys = loadJson(KEY_STORAGE, {dictionary:'', thesaurus:''});
   let progress = loadJson(PROGRESS_STORAGE, defaultProgress());
-  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:'balanced', appearance:'system', lastVersion:null});
+  let settings = loadJson(SETTINGS_STORAGE, {sessionSize:10, direction:'word-def', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:'balanced', appearance:'system', answerSounds:false, lastVersion:null});
   let session = null;
   let installPrompt = null;
   let currentWordDetail = null;
   let pronunciationAudio = null;
+  let toneContext = null;
   let wordPage = 0;
   let historyLimit = 25;
   const transientDictionary = new Map();
@@ -597,7 +598,20 @@
     suppressDisclosureHistory=false;
   }
 
+  function preferredDirection() {
+    return ['word-def','def-word','mixed'].includes(settings.direction) ? settings.direction : 'word-def';
+  }
+
+  function selectQuestionDirection(value) {
+    if (!['word-def','def-word','mixed'].includes(value)) return;
+    settings={...settings,direction:value};
+    saveState();
+    qsa('input[name="homeDirection"]').forEach(input=>{input.checked=input.value===value;});
+    $('questionDirection').value=value;
+  }
+
   function renderHome() {
+    qsa('input[name="homeDirection"]').forEach(input=>{input.checked=input.value===preferredDirection();});
     const studyItems = allStudyWords();
     const activeItems = studyItems.filter(({word}) => !getExistingWordState(word).suspended && !isInvalidSeed(word));
     const states = studyItems.map(({word}) => getExistingWordState(word));
@@ -652,7 +666,7 @@
     $('sessionHomeButton').classList.remove('hidden');
     updateAppBar();
     $('sessionSize').value = String(settings.sessionSize || 10);
-    $('questionDirection').value = settings.direction || 'word-def';
+    $('questionDirection').value = preferredDirection();
     $('practiceSource').value = settings.source || 'all';
     $('practiceCollection').value = COLLECTION_MAP.has(settings.collection) ? settings.collection : 'all';
     $('newWordMix').value = ['low','balanced','high'].includes(settings.novelty) ? settings.novelty : 'balanced';
@@ -782,7 +796,7 @@
     }
     if (!selected.length) return null;
     return {mode:'level',queue:shuffle(selected.slice(0,size)).map(item=>({...item,repeat:false})),index:0,answered:0,correct:0,current:null,completed:false,
-      direction:'word-def',levels:[level],source:'all',collection:'all',novelty:'high',plannedCount:Math.min(size,selected.length)};
+      direction:preferredDirection(),levels:[level],source:'all',collection:'all',novelty:'high',plannedCount:Math.min(size,selected.length)};
   }
 
   async function beginLevelSession(level) {
@@ -824,7 +838,7 @@
       mode:kind==='discover' ? 'discover' : 'quick',
       queue:selected.slice(0,size).map(item=>({...item,repeat:false})),
       index:0, answered:0, correct:0, current:null, completed:false,
-      direction:'word-def', levels:[1,2,3,4,5], source:'all', collection:'all', novelty:kind==='discover'?'high':'balanced', plannedCount:Math.min(size,selected.length)
+      direction:preferredDirection(), levels:[1,2,3,4,5], source:'all', collection:'all', novelty:kind==='discover'?'high':'balanced', plannedCount:Math.min(size,selected.length)
     };
   }
 
@@ -1113,6 +1127,522 @@
     return uniqueExamples.slice(0,3);
   }
 
+  // Authored study examples used only when the dictionary has no aligned usage illustration.
+  // These sentences illustrate a common sense of each word; no fabricated quotes are attributed to MW.
+  const CURATED_EXAMPLES = Object.freeze({
+    "abrupt": "The meeting ended abruptly when the fire alarm sounded.",
+    "adapt": "The team had to adapt its process after the software changed.",
+    "adequate": "The inspection found that the existing insulation was adequate for the climate.",
+    "ambiguous": "The contract used ambiguous language that both parties interpreted differently.",
+    "apparent": "Her frustration became apparent when she stopped responding.",
+    "assume": "Do not assume that the quoted price includes installation.",
+    "coherent": "He presented a coherent explanation that connected the evidence to his conclusion.",
+    "compile": "We need to compile the monthly figures into a single report.",
+    "concede": "She was willing to concede that the opposing argument had merit.",
+    "conspicuous": "The bright orange notice was conspicuous against the white wall.",
+    "crucial": "Accurate measurements are crucial when ordering replacement parts.",
+    "derive": "Researchers derive the estimate from several independent data sources.",
+    "diminish": "The noise began to diminish as the traffic moved farther away.",
+    "dispute": "The neighbors dispute where the property boundary lies.",
+    "elaborate": "Could you elaborate on what the inspector meant by that warning?",
+    "feasible": "Replacing the roof this month is not feasible without additional funds.",
+    "impartial": "The mediator remained impartial throughout the disagreement.",
+    "inevitable": "Some disruption was inevitable during the renovation.",
+    "notion": "She rejected the notion that a higher price always means better quality.",
+    "reluctant": "He was reluctant to sign before reading the full agreement.",
+    "alleviate": "Opening the window helped alleviate the stuffy conditions.",
+    "anomaly": "A sudden spike in expenses was an anomaly compared with earlier months.",
+    "arbitrary": "The cutoff date seemed arbitrary because no one explained why it was chosen.",
+    "bolster": "The new evidence helped bolster her original argument.",
+    "candid": "During the review, he gave a candid assessment of the project’s weaknesses.",
+    "complacent": "The team became complacent after several months without a problem.",
+    "conventional": "They chose a conventional refrigerator rather than a smart model.",
+    "diligent": "Her diligent recordkeeping made the audit much easier.",
+    "disparity": "The report revealed a large disparity between advertised and actual costs.",
+    "elusive": "Despite repeated searches, the source of the leak remained elusive.",
+    "empirical": "The recommendation was supported by empirical evidence gathered in tests.",
+    "exacerbate": "Delaying the repair could exacerbate the water damage.",
+    "fluctuate": "Electricity prices fluctuate throughout the year.",
+    "frugal": "He made a frugal choice by repairing the appliance instead of replacing it.",
+    "inhibit": "Too many notifications can inhibit concentration.",
+    "meticulous": "She kept meticulous notes about every change to the plan.",
+    "plausible": "The explanation sounded plausible, but it still needed verification.",
+    "pragmatic": "They took a pragmatic approach and fixed the most serious problems first.",
+    "scrutinize": "The reviewer will scrutinize the contract for unexpected fees.",
+    "tenuous": "The connection between the two events was tenuous at best.",
+    "aberration": "The unusually high reading appeared to be an aberration rather than a trend.",
+    "ameliorate": "The updated procedure should ameliorate the delay experienced by applicants.",
+    "antithetical": "The secrecy was antithetical to the organization’s stated commitment to openness.",
+    "capricious": "Her capricious decisions made it difficult for the team to plan ahead.",
+    "cogent": "He offered a cogent argument supported by several concrete examples.",
+    "deleterious": "Prolonged exposure to moisture can have deleterious effects on wooden structures.",
+    "didactic": "The novel felt didactic because its characters constantly explained moral lessons.",
+    "equivocal": "His equivocal response left everyone unsure whether he agreed.",
+    "fastidious": "The editor was fastidious about spelling and punctuation.",
+    "iconoclast": "An iconoclast challenged the long-standing practices that others accepted without question.",
+    "intransigent": "The negotiator remained intransigent despite several reasonable proposals.",
+    "laconic": "His laconic reply consisted of only two words.",
+    "magnanimous": "After winning the debate, she was magnanimous toward her opponent.",
+    "obfuscate": "The dense technical language seemed designed to obfuscate a simple problem.",
+    "parsimonious": "The manager was parsimonious with funds even when repairs were necessary.",
+    "perfunctory": "The inspector gave the equipment only a perfunctory glance.",
+    "prosaic": "The explanation turned out to be prosaic: someone had unplugged the cable.",
+    "sagacious": "Her sagacious advice helped the group avoid an expensive mistake.",
+    "ubiquitous": "Smartphones are now ubiquitous in everyday life.",
+    "vacillate": "He continued to vacillate between renting and buying.",
+    "abstemious": "Her abstemious habits made the expensive celebration seem unusual.",
+    "apocryphal": "The story about the inventor may be apocryphal; no reliable source confirms it.",
+    "calumny": "The candidate accused the publication of spreading calumny about her record.",
+    "circumlocution": "Instead of answering directly, he used circumlocution to avoid the question.",
+    "contumacious": "The contumacious witness repeatedly ignored the judge’s instructions.",
+    "desultory": "Their desultory conversation jumped from topic to topic without direction.",
+    "diaphanous": "Sunlight passed through the diaphanous curtains.",
+    "eleemosynary": "The organization relied on eleemosynary contributions to support its programs.",
+    "epistemic": "The debate raised an epistemic question about what counts as reliable knowledge.",
+    "execrable": "The repairs were so poorly done that the workmanship was execrable.",
+    "fulsome": "The speaker offered fulsome praise for the volunteers’ efforts.",
+    "impecunious": "The impecunious student searched for scholarships to cover tuition.",
+    "inveterate": "An inveterate reader, she rarely left home without a book.",
+    "meretricious": "The flashy advertisement made promises that felt meretricious rather than credible.",
+    "perspicacious": "The perspicacious analyst noticed a pattern that others had overlooked.",
+    "recondite": "The lecture explored recondite questions in medieval philosophy.",
+    "sesquipedalian": "His sesquipedalian writing used long words where short ones would do.",
+    "supercilious": "Her supercilious tone suggested that she considered the question beneath her.",
+    "vicissitude": "The travelers adapted to each vicissitude of the long journey.",
+    "abecedarian": "The abecedarian lesson began with the letters A, B, and C.",
+    "adumbrate": "The opening chapter began to adumbrate the conflict that would dominate the novel.",
+    "anfractuous": "They followed an anfractuous path through the mountain foothills.",
+    "antediluvian": "The office still used an antediluvian filing system based entirely on paper.",
+    "apothegm": "The teacher opened each lesson with a short apothegm about patience.",
+    "ataraxia": "After years of turmoil, she sought the ataraxia described by ancient philosophers.",
+    "catachresis": "Calling the base of a table its foot is a familiar example of catachresis.",
+    "concinnity": "The editor admired the concinnity of the essay’s carefully balanced sentences.",
+    "crepuscular": "Bats are often crepuscular, becoming active around dusk.",
+    "defenestration": "The broken window prompted jokes about the defenestration of the old computer.",
+    "epigone": "Critics dismissed the artist as an epigone of a more original painter.",
+    "farrago": "The presentation was a farrago of unrelated facts and unsupported claims.",
+    "ineluctable": "Despite their objections, the deadline was ineluctable.",
+    "noisome": "A noisome odor drifted from the neglected drain.",
+    "palimpsest": "The manuscript was a palimpsest with traces of an older text beneath the new writing.",
+    "panegyric": "The retirement speech became a panegyric celebrating her decades of service.",
+    "ratiocinate": "The detective tried to ratiocinate from the available clues.",
+    "susurrus": "The susurrus of wind through the leaves was barely audible.",
+    "tergiversate": "The official continued to tergiversate rather than state a clear position.",
+    "zeugma": "In the sentence “She broke his car and his heart,” the shared verb creates zeugma.",
+    "convention": "By convention, formal letters begin with a greeting.",
+    "influence": "The early reviews had a strong influence on the committee’s decision.",
+    "evident": "It was evident from the photographs that the roof had been damaged.",
+    "farther": "The second store was farther away than we expected.",
+    "conflict": "A conflict arose when the two departments adopted different schedules.",
+    "agreement": "The written agreement specified which repairs the seller would complete.",
+    "obvious": "The mistake became obvious when they compared the two totals.",
+    "suppose": "Suppose the interest rate rises next year; how would that change the payment?",
+    "resolution": "After several meetings, they finally reached a resolution of the dispute.",
+    "principle": "The decision was guided by the principle that everyone should have equal access.",
+    "solemn": "The witnesses made a solemn promise to tell the truth.",
+    "diplomatic": "She gave a diplomatic response that acknowledged both perspectives.",
+    "standard": "The software must meet the organization’s accessibility standard.",
+    "confidence": "Repeated practice increased her confidence in using the keyboard.",
+    "excuse": "A technical difficulty is not always an excuse for missing a deadline.",
+    "describe": "Please describe the appearance of the object in the photograph.",
+    "continuous": "The machine requires a continuous supply of electricity.",
+    "association": "The researchers found an association between exercise and better sleep.",
+    "reference": "The manual serves as a reference when unusual problems arise.",
+    "claim": "The contractor made a claim that the installation met local codes.",
+    "inquiry": "The office received an inquiry about the missing documents.",
+    "outcome": "They measured the outcome before changing the policy.",
+    "principal": "The principal amount of the loan decreases with each payment toward the balance.",
+    "clause": "The lease contained a clause restricting changes to the property.",
+    "colon": "A colon can introduce a list of items.",
+    "apostrophe": "The apostrophe in “teacher’s” indicates possession.",
+    "predicate": "In the sentence “The dog barked,” the predicate is “barked.”",
+    "semicolon": "A semicolon can connect two closely related independent clauses.",
+    "effect": "The change had an immediate effect on the monthly payment.",
+    "evidence": "The photos provided evidence of the damage.",
+    "sufficient": "The documents contained sufficient detail to support the decision.",
+    "compromise": "Both sides accepted a compromise that met their most important needs.",
+    "trenchant": "The review offered a trenchant critique of the proposed policy.",
+    "significance": "The findings had particular significance for people who rely on screen readers.",
+    "jurisdiction": "The local court had jurisdiction over the dispute.",
+    "obligation": "The agreement created an obligation to finish the work by Friday.",
+    "composition": "The committee changed its composition after the election.",
+    "confirmation": "She requested written confirmation before booking the appointment.",
+    "consistent": "His account remained consistent throughout the interview.",
+    "courtesy": "The manager called as a courtesy to explain the delay.",
+    "deduction": "The accountant identified a deduction that reduced taxable income.",
+    "eloquent": "She gave an eloquent speech that persuaded the audience.",
+    "eminent": "The panel included an eminent scholar of constitutional law.",
+    "mechanism": "The engineer explained the mechanism that keeps the door from slamming.",
+    "negotiate": "The parties agreed to negotiate the remaining contract terms.",
+    "abstract": "The discussion became so abstract that no one proposed a practical solution.",
+    "acknowledge": "The report should acknowledge the limitations of the available evidence.",
+    "differentiate": "The instructor asked students to differentiate facts from opinions.",
+    "emphasis": "The training placed special emphasis on accessible keyboard navigation.",
+    "induction": "The reasoning relied on induction from several observed examples.",
+    "interpretation": "Her interpretation of the rule differed from the manager’s.",
+    "negotiation": "The negotiation ended when both sides agreed on the price.",
+    "transparent": "The agency published a transparent explanation of how applications are reviewed.",
+    "attribute": "Researchers attribute the improvement partly to more frequent practice.",
+    "deception": "The investigation uncovered deliberate deception in the advertising.",
+    "defensive": "He became defensive when the reviewer questioned his calculations.",
+    "retention": "Frequent review can improve retention of new vocabulary.",
+    "stress": "The speaker placed stress on the final word of the sentence.",
+    "conjunction": "The conjunction “although” introduces a contrast.",
+    "facilitate": "Clear instructions can facilitate independent use of the application.",
+    "identify": "The witness could not identify the person in the photograph.",
+    "illustrate": "The instructor used a short story to illustrate the concept.",
+    "implication": "One implication of the finding is that the original estimate was too low.",
+    "integrity": "The audit raised concerns about the integrity of the underlying data.",
+    "memorandum": "The analyst wrote a memorandum explaining the recommended change.",
+    "recommendation": "Her recommendation was to repair the existing equipment.",
+    "relationship": "The chart showed a relationship between price and demand.",
+    "respond": "Please respond to the request before the deadline.",
+    "sincerity": "Her sincerity was clear from her willingness to admit mistakes.",
+    "acceptance": "Formal acceptance of the proposal required a signed document.",
+    "accuracy": "The team checked the accuracy of every number in the report.",
+    "alternate": "We planned an alternate route in case the road was closed.",
+    "assert": "He continued to assert that the warranty covered the damage.",
+    "climax": "The story reaches its climax when the characters finally confront each other.",
+    "demonstrate": "She used the keyboard to demonstrate how the feature works.",
+    "elective": "The student chose an elective course in public speaking.",
+    "exposition": "The novel begins with an exposition of the characters and setting.",
+    "insight": "Her comment provided useful insight into why the procedure failed.",
+    "reconciliation": "Bank reconciliation revealed a transaction that had been recorded twice.",
+    "specialist": "A specialist examined the electrical panel before repairs began.",
+    "allusion": "The poem contains an allusion to an ancient Greek myth.",
+    "compliment": "The editor gave her a compliment about the clarity of her writing.",
+    "concept": "The teacher introduced the concept with a familiar example.",
+    "concession": "The seller offered a concession to cover part of the closing costs.",
+    "conversion": "The conversion of inches to centimeters was shown in the worksheet.",
+    "denote": "A red symbol may denote an urgent item on the chart.",
+    "disclose": "The seller must disclose certain known problems with the property.",
+    "imminent": "The darkening sky suggested that heavy rain was imminent.",
+    "objection": "The attorney raised an objection during the testimony.",
+    "pattern": "The analyst noticed a repeating pattern in the monthly figures.",
+    "syllable": "The word “window” has two syllables.",
+    "analyze": "The team will analyze the survey results before revising the interface.",
+    "appropriation": "The legislature approved an appropriation for the new program.",
+    "comparable": "The estimate was based on prices for comparable nearby homes.",
+    "compatible": "The new software is compatible with the existing screen reader.",
+    "confound": "The unexpected result may confound the original explanation.",
+    "construct": "Workers will construct a ramp beside the entrance.",
+    "deviation": "Any deviation from the approved plan needs documentation.",
+    "eloquence": "The audience admired the eloquence of her closing statement.",
+    "expenditure": "The repair was the largest unexpected expenditure of the month.",
+    "interaction": "The test measured how each interaction affected keyboard focus.",
+    "manuscript": "The editor reviewed the manuscript before publication.",
+    "reconcile": "The accountant had to reconcile two conflicting totals.",
+    "symbol": "The arrow is a symbol indicating the direction of travel.",
+    "accommodation": "The employee requested an accommodation to use assistive software.",
+    "anecdote": "He told an anecdote about his first day on the job.",
+    "autobiography": "She wrote an autobiography describing her early career.",
+    "biography": "The biography follows the scientist from childhood to retirement.",
+    "coordinate": "The offices must coordinate their schedules for the joint inspection.",
+    "disagreement": "Their disagreement centered on which costs were necessary.",
+    "enhance": "The update should enhance readability for screen reader users.",
+    "explore": "We can explore several solutions before choosing one.",
+    "investment": "She regarded continuing education as an investment in her future.",
+    "manipulation": "The report warned against manipulation of the survey results.",
+    "payable": "The invoice states that the balance is payable within thirty days.",
+    "presumption": "The argument rests on the presumption that all applicants have internet access.",
+    "satire": "The article used satire to criticize bureaucratic inefficiency.",
+    "theoretical": "The proposal is theoretically possible, but nobody has tested it.",
+    "veteran": "The veteran employee helped train the new staff member.",
+    "accommodate": "The schedule can accommodate a later appointment.",
+    "antagonist": "The antagonist opposes the protagonist throughout the story.",
+    "anticipate": "The planner tried to anticipate problems before the launch.",
+    "compose": "She will compose the letter before the meeting.",
+    "concise": "The instructions were concise enough to remember after one reading.",
+    "conditional": "The offer was conditional on a satisfactory inspection.",
+    "cooperate": "Both teams agreed to cooperate on the investigation.",
+    "discreet": "He made a discreet inquiry rather than discussing the issue publicly.",
+    "formula": "The spreadsheet uses a formula to calculate the total.",
+    "hierarchy": "The chart showed the organization’s management hierarchy.",
+    "impact": "The change could have a substantial impact on monthly expenses.",
+    "interpret": "The reader may interpret the ending in several ways.",
+    "investigate": "An electrician will investigate the cause of the outage.",
+    "mediation": "Mediation helped the neighbors settle their dispute.",
+    "omission": "The missing signature was an important omission from the form.",
+    "protocol": "The laboratory followed a strict protocol for collecting samples.",
+    "sarcasm": "Her sarcasm was difficult to recognize from the text alone.",
+    "soundness": "The reviewer questioned the soundness of the original calculation.",
+    "analogous": "A budget is analogous to a plan for allocating limited resources.",
+    "applicant": "The applicant submitted the required documents online.",
+    "articulation": "Her careful articulation made the presentation easy to follow.",
+    "austere": "The office had an austere appearance, with almost no decoration.",
+    "authentic": "The museum confirmed that the letter was authentic.",
+    "coercion": "The agreement was invalid because it had been signed under coercion.",
+    "competitive": "The company submitted a competitive bid for the contract.",
+    "complement": "The new training materials complement the existing course.",
+    "concealment": "The inspector found evidence of concealment behind the new wall panel.",
+    "configuration": "A different keyboard configuration solved the problem.",
+    "consistency": "Consistency in the instructions made the app easier to learn.",
+    "context": "The word has a different meaning in this context.",
+    "cynical": "His cynical response suggested that he expected every promise to be broken.",
+    "depreciation": "The accountant recorded depreciation on the equipment each year.",
+    "discrete": "The report divided the problem into several discrete tasks.",
+    "dismiss": "The committee voted to dismiss the complaint.",
+    "efficacy": "The study examined the efficacy of the new treatment.",
+    "entail": "The renovation will entail replacing the damaged wiring.",
+    "ethical": "The consultant raised an ethical concern about the proposed plan.",
+    "fiction": "The story is a work of fiction rather than a historical account.",
+    "insure": "The policy will insure the building against certain types of damage.",
+    "monograph": "The researcher published a monograph on medieval trade.",
+    "reproduction": "The museum displayed a reproduction of the original painting.",
+    "rhetoric": "The speech relied on emotional rhetoric rather than specific evidence.",
+    "rhythm": "The poem’s rhythm becomes more pronounced when it is read aloud.",
+    "signify": "A blinking light may signify a problem with the device.",
+    "summarize": "Please summarize the main findings in one paragraph.",
+    "technique": "She developed a technique for locating controls by touch.",
+    "understandable": "The instructions were understandable even to someone new to the software.",
+    "algebra": "The course introduced algebra using equations with one unknown.",
+    "arithmetic": "Mental arithmetic helped her check the total quickly.",
+    "assessment": "The assessment identified several areas needing improvement.",
+    "assignment": "The instructor posted the assignment before class.",
+    "certificate": "She received a certificate after completing the training.",
+    "contractor": "The contractor submitted a detailed estimate for the repairs.",
+    "curriculum": "The school revised its curriculum to include accessibility testing.",
+    "descriptive": "A descriptive label helped the user identify the unlabeled button.",
+    "equation": "The equation has the same value on both sides.",
+    "florid": "The florid language distracted from the main argument.",
+    "fraction": "One quarter is a fraction representing one part out of four.",
+    "honesty": "Her honesty made the difficult conversation more productive.",
+    "inequality": "The report examined inequality in access to technology.",
+    "judgement": "The manager exercised good judgement when prioritizing repairs.",
+    "mandatory": "Attendance at the safety meeting is mandatory.",
+    "mitigate": "The team installed temporary barriers to mitigate the risk.",
+    "option": "She selected the least expensive option that met the requirements.",
+    "obsolete": "The software was obsolete and no longer received security updates.",
+    "analytical": "His analytical approach helped identify the problem step by step.",
+    "narrator": "The narrator describes events from the perspective of a child.",
+    "personification": "Calling the wind angry is an example of personification.",
+    "vocabulary": "Reading regularly helped expand her vocabulary.",
+    "whimsical": "The whimsical illustration made the serious report feel playful.",
+    "dialogue": "The dialogue revealed the characters’ conflicting motives.",
+    "informal": "They used an informal tone when chatting with colleagues.",
+    "monologue": "The actor delivered a long monologue at the end of the play.",
+    "poignant": "The final letter was especially poignant because it arrived too late.",
+    "sardonic": "He offered a sardonic smile when the plan failed exactly as predicted.",
+    "archaic": "The legal form used archaic phrases that most readers no longer understood.",
+    "cadence": "The speaker’s steady cadence made the instructions easy to follow.",
+    "characterization": "The author’s characterization gave the villain believable motives.",
+    "colloquial": "The dialogue used colloquial expressions heard in everyday speech.",
+    "diction": "The writer adjusted her diction to suit a professional audience.",
+    "earnest": "He made an earnest attempt to correct the mistake.",
+    "epigram": "The essay begins with an epigram about the importance of patience.",
+    "euphemism": "“Passed away” is a common euphemism for “died.”",
+    "evocative": "The description was evocative of a quiet winter morning.",
+    "expository": "The chapter’s expository paragraphs explain how the machine works.",
+    "figurative": "Her figurative language compared the dispute to a storm.",
+    "flashback": "The novel uses a flashback to explain the character’s childhood.",
+    "genre": "The book combines elements of the mystery and fantasy genres.",
+    "hyperbole": "Saying “I waited a million years” is hyperbole.",
+    "idiom": "“Break the ice” is an idiom that means easing social tension.",
+    "imagery": "The vivid imagery made the forest seem almost visible.",
+    "interpretive": "The museum’s interpretive display explained the historical setting.",
+    "irreverent": "The comedian’s irreverent jokes mocked respected traditions.",
+    "jargon": "The presentation used jargon that confused people outside the profession.",
+    "lexicon": "The new profession introduced terms that were unfamiliar to her lexicon.",
+    "litotes": "Saying “not bad” to mean “good” is an example of litotes.",
+    "meter": "The poem’s meter follows a regular pattern of stressed syllables.",
+    "neologism": "The writer coined a neologism to describe the new phenomenon.",
+    "nonfiction": "The memoir was shelved with other works of nonfiction.",
+    "nuanced": "Her nuanced answer acknowledged several important exceptions.",
+    "ornate": "The ornate frame was covered with detailed carved patterns.",
+    "oxymoron": "The phrase “deafening silence” is an oxymoron.",
+    "paradox": "The paradox is that the policy designed to save time created more delays.",
+    "parody": "The film was a parody of familiar superhero stories.",
+    "persuasive": "The proposal was persuasive because it offered evidence and practical steps.",
+    "phonetic": "She wrote a phonetic guide to help readers pronounce the name.",
+    "polemical": "The polemical essay attacked its opponents with little attempt at balance.",
+    "protagonist": "The protagonist confronts the main conflict in the final chapter.",
+    "rhetorical": "He asked a rhetorical question that did not require an answer.",
+    "simile": "“Her voice was like thunder” is a simile.",
+    "soliloquy": "The character speaks alone in a soliloquy revealing his fears.",
+    "stanza": "The poem contains four lines in each stanza.",
+    "symbolism": "The recurring broken clock carries symbolism throughout the novel.",
+    "terminology": "The training introduces terminology used in federal procurement.",
+    "trope": "The story uses the familiar trope of a reluctant hero.",
+    "understatement": "Calling a severe storm “a bit of rain” is an understatement.",
+    "verbose": "The instructions were so verbose that readers missed the main point.",
+    "acquiesce": "After lengthy objections, the committee agreed to acquiesce.",
+    "adulation": "The celebrity appeared uncomfortable with the crowd’s adulation.",
+    "adversary": "The two rivals treated each other as adversaries.",
+    "adversity": "She showed resilience in the face of considerable adversity.",
+    "aloofness": "His aloofness made it difficult for new colleagues to approach him.",
+    "animosity": "Years of animosity made cooperation between the neighbors unlikely.",
+    "annihilate": "The fire threatened to annihilate the remaining structures.",
+    "appellate": "The appellate court reviewed the ruling from the lower court.",
+    "appraise": "An expert will appraise the property before the lender approves the loan.",
+    "apprehend": "The police were able to apprehend the suspect after a short search.",
+    "arbitrate": "Both sides agreed to arbitrate the dispute rather than go to court.",
+    "arrogance": "His arrogance prevented him from listening to useful criticism.",
+    "aspiration": "Her aspiration was to become a professional analyst.",
+    "assimilation": "The course examined the assimilation of newcomers into local culture.",
+    "atrocious": "The hotel received complaints about its atrocious cleanliness.",
+    "authoritative": "The agency issued an authoritative explanation of the new rule.",
+    "autonomous": "The new system operates as an autonomous unit without constant supervision.",
+    "banishment": "The story begins with the hero’s banishment from the kingdom.",
+    "benevolence": "Her benevolence was evident in the time she devoted to helping others.",
+    "bourgeois": "The novel satirizes the aspirations of a bourgeois family.",
+    "cavalier": "His cavalier attitude toward safety angered the inspector.",
+    "celerity": "The team responded with unexpected celerity to the urgent request.",
+    "celestial": "The telescope revealed several celestial objects.",
+    "chivalrous": "He performed a chivalrous act by helping the stranger without expecting thanks.",
+    "circumstantial": "The prosecution relied largely on circumstantial evidence.",
+    "civility": "Despite their disagreement, both participants maintained civility.",
+    "clandestine": "They held a clandestine meeting away from the public eye.",
+    "clemency": "The prisoner petitioned the governor for clemency.",
+    "coalesce": "Several smaller groups began to coalesce into one organization.",
+    "cognizance": "The manager took cognizance of the repeated accessibility complaints.",
+    "commendation": "She received a commendation for her careful work.",
+    "commensurate": "The salary should be commensurate with the responsibilities of the role.",
+    "compassionate": "The nurse offered a compassionate response to the worried family.",
+    "complacency": "Complacency made the team overlook a preventable mistake.",
+    "compulsion": "He felt a compulsion to check the lock repeatedly.",
+    "conciliate": "The mediator tried to conciliate the two angry parties.",
+    "conciliatory": "Her conciliatory remarks helped calm the tense meeting.",
+    "concurrent": "The project involved two concurrent inspections.",
+    "confiscate": "The officer had authority to confiscate the prohibited items.",
+    "confluence": "A confluence of factors led to the unexpected result.",
+    "congenial": "The small team enjoyed a congenial working atmosphere.",
+    "connivance": "The scheme succeeded through the connivance of several insiders.",
+    "consolidate": "The department will consolidate reports from several offices.",
+    "consummate": "She was a consummate professional even under intense pressure.",
+    "contiguous": "The two parcels were contiguous and shared a boundary.",
+    "contrive": "The characters contrive an elaborate plan to escape.",
+    "conversant": "She was conversant with the relevant regulations.",
+    "convoluted": "The convoluted instructions made a simple task seem difficult.",
+    "cosmopolitan": "The city’s cosmopolitan population speaks dozens of languages.",
+    "cumulative": "The cumulative effect of many small delays became substantial.",
+    "deceptive": "The advertisement was deceptive because it omitted key conditions.",
+    "decrepit": "The decrepit building required major structural repairs.",
+    "degradation": "Years of neglect caused the degradation of the wooden fence.",
+    "dejection": "His dejection was apparent after the proposal was rejected.",
+    "deplorable": "The inspector found the building in deplorable condition.",
+    "deranged": "The deranged character spoke as though he were being pursued.",
+    "derogation": "The change was viewed as a derogation of established rights.",
+    "designation": "The official designation determines which department handles the matter.",
+    "despicable": "The committee condemned the despicable treatment of the workers.",
+    "despondent": "She felt despondent after receiving several rejections.",
+    "destitute": "The flood left many families destitute.",
+    "detriment": "The delay worked to the detriment of the people awaiting help.",
+    "dilapidated": "The dilapidated porch needed complete reconstruction.",
+    "diligence": "Her diligence helped catch the error before the deadline.",
+    "diminutive": "The diminutive cabin was barely large enough for one person.",
+    "discernible": "There was no discernible difference between the two recordings.",
+    "disconcert": "The sudden silence seemed to disconcert the speaker.",
+    "discredit": "The contradictory evidence could discredit the witness.",
+    "discriminate": "The test was designed to discriminate between similar sounds.",
+    "disdainful": "He made a disdainful remark about the proposal.",
+    "disgruntled": "The disgruntled employee submitted a formal complaint.",
+    "disreputable": "The article warned readers about a disreputable lender.",
+    "disrepute": "The scandal brought the organization into disrepute.",
+    "distortion": "The poor microphone caused distortion in the recording.",
+    "equitable": "The committee wanted an equitable distribution of resources.",
+    "escapade": "The children’s late-night escapade ended when their parents called.",
+    "etiquette": "The training covered etiquette for professional correspondence.",
+    "extravagant": "The extravagant purchase exceeded the planned budget.",
+    "extricate": "The workers had to extricate the vehicle from the mud.",
+    "flagrant": "The report documented a flagrant violation of safety procedures.",
+    "forestall": "They inspected the roof to forestall more serious water damage.",
+    "formulate": "The group met to formulate a practical plan.",
+    "fortitude": "She showed fortitude through months of difficult rehabilitation.",
+    "grotesque": "The statue had a grotesque face with exaggerated features.",
+    "groundless": "The rumor was groundless and unsupported by evidence.",
+    "homogeneous": "The sample was too homogeneous to represent the wider population.",
+    "illusory": "The apparent savings were illusory after hidden fees were included.",
+    "immutable": "The policy was treated as immutable even though conditions had changed.",
+    "imperturbable": "The instructor remained imperturbable despite repeated interruptions.",
+    "impoverished": "The program provides assistance to impoverished households.",
+    "impudence": "Her impudence surprised the normally patient supervisor.",
+    "incisive": "The editor offered incisive feedback on the weak reasoning.",
+    "incontestable": "The video provided incontestable evidence of the sequence of events.",
+    "incumbent": "It is incumbent on supervisors to respond to reported hazards.",
+    "infallible": "No measurement system is infallible.",
+    "inimical": "The proposal was inimical to the agency’s commitment to open access.",
+    "sanguine": "Despite the setbacks, she remained sanguine about the project’s outcome.",
+    "obdurate": "The obdurate official refused to consider any exceptions.",
+    "recalcitrant": "The recalcitrant student repeatedly ignored the teacher’s instructions.",
+    "circumspect": "She was circumspect about sharing information before it was verified.",
+    "ennui": "A sense of ennui settled over him during the long, uneventful summer.",
+    "abstruse": "The textbook’s abstruse explanation confused even advanced students.",
+    "ebullient": "Her ebullient personality lifted the mood of the entire team.",
+    "garrulous": "The garrulous passenger talked throughout the long journey.",
+    "invective": "The debate deteriorated into invective rather than constructive criticism.",
+    "mendacious": "The witness gave a mendacious account that contradicted the video evidence.",
+    "acerbic": "His acerbic response made the conversation more hostile.",
+    "acolyte": "The political leader was surrounded by loyal acolytes.",
+    "aegis": "The program operated under the aegis of the national organization.",
+    "alacrity": "She accepted the opportunity with surprising alacrity.",
+    "anodyne": "The committee issued an anodyne statement that avoided controversy.",
+    "approbation": "Her work earned the approbation of several respected colleagues.",
+    "arcane": "The procedure depended on arcane rules that few employees understood.",
+    "asperity": "There was a noticeable asperity in his voice during the argument.",
+    "assiduous": "Her assiduous preparation helped her pass the difficult examination.",
+    "avuncular": "The older mentor had an avuncular manner with new employees.",
+    "bellicose": "The bellicose speech raised fears that negotiations would collapse.",
+    "bombastic": "The candidate’s bombastic promises lacked practical detail.",
+    "bromide": "The speech offered a bromide about hard work instead of a real solution.",
+    "cacophony": "A cacophony of horns filled the crowded intersection.",
+    "canard": "The article repeated the canard that the new policy had already been approved.",
+    "chicanery": "The investigation uncovered financial chicanery in the bidding process.",
+    "cogitate": "She needed time to cogitate before making a major decision.",
+    "compunction": "He felt no compunction about taking credit for someone else’s work.",
+    "cupidity": "His cupidity led him to conceal the fees from customers.",
+    "dilatory": "The court criticized the company’s dilatory response to the complaint.",
+    "ersatz": "The restaurant served an ersatz cheese made entirely from vegetable oil.",
+    "esoteric": "The lecture covered an esoteric branch of ancient philosophy.",
+    "expiate": "He volunteered for years in an effort to expiate his earlier wrongdoing.",
+    "extirpate": "The campaign aimed to extirpate the invasive plant from the park.",
+    "fecund": "The fecund soil supported a remarkably diverse range of crops.",
+    "fulminate": "The commentator continued to fulminate against the decision.",
+    "heterodox": "Her heterodox ideas challenged the accepted practices of the field.",
+    "hirsute": "The hirsute character had a thick beard and shaggy hair.",
+    "hubris": "His hubris led him to ignore repeated warnings from experts.",
+    "inchoate": "The proposal was still inchoate and lacked specific steps.",
+    "ineffable": "The experience inspired an ineffable sense of wonder.",
+    "insouciant": "He offered an insouciant shrug when asked about the missed deadline.",
+    "jejune": "The critique was jejune and failed to address the substantive issues.",
+    "lachrymose": "The film’s lachrymose ending left the audience in tears.",
+    "legerdemain": "The magician’s legerdemain made the coin appear to vanish.",
+    "lugubrious": "The song’s lugubrious melody suited the funeral scene.",
+    "malapropism": "Calling a “pineapple” a “pinnacle” can be a malapropism.",
+    "mordant": "Her mordant humor exposed the absurdity of the rule.",
+    "munificent": "A munificent donor funded the new public library.",
+    "numinous": "The cathedral’s silence gave the visit a numinous quality.",
+    "opprobrium": "The fraud brought public opprobrium upon the company.",
+    "parsimony": "The board’s parsimony prevented necessary maintenance.",
+    "peccadillo": "He treated the minor scheduling error as a peccadillo.",
+    "pellucid": "The explanation was pellucid and easy to follow.",
+    "perfidious": "The perfidious ally secretly betrayed the group’s plans.",
+    "prolix": "The prolix memo buried its main recommendation in unnecessary detail.",
+    "quotidian": "Preparing breakfast was part of her quotidian routine.",
+    "raconteur": "The charming raconteur entertained everyone with colorful stories.",
+    "redolent": "The kitchen was redolent of freshly baked bread.",
+    "risible": "The claim was so implausible that it seemed risible.",
+    "salubrious": "The cool air and walking trails created a salubrious environment.",
+    "saturnine": "His saturnine expression made it difficult to tell whether he approved.",
+    "scintilla": "There was not a scintilla of evidence to support the accusation.",
+    "simulacrum": "The display used a simulacrum of the original historical artifact.",
+    "solipsism": "The essay explores solipsism and the problem of knowing other minds.",
+    "somnolent": "The room grew somnolent during the slow afternoon lecture.",
+    "synecdoche": "Using “wheels” to refer to a car is an example of synecdoche.",
+    "timorous": "The timorous speaker hesitated before addressing the audience.",
+    "truculent": "The truculent customer threatened staff over a minor delay.",
+    "verisimilitude": "The historical details gave the novel a strong sense of verisimilitude.",
+    "vociferous": "A vociferous group of residents protested the proposed road.",
+    "winsome": "Her winsome smile helped put the nervous guests at ease."
+  });
+
+  function studyIllustrations(word, dictionaryExamples) {
+    if (Array.isArray(dictionaryExamples) && dictionaryExamples.length) {
+      return {examples:dictionaryExamples, exampleSource:'dictionary'};
+    }
+    const curated=CURATED_EXAMPLES[String(word || '').toLowerCase()];
+    return curated ? {examples:[curated],exampleSource:'app'} : {examples:[],exampleSource:'none'};
+  }
+
   function pronunciationAudioUrl(entry) {
     const pronunciations=[...(Array.isArray(entry?.hwi?.prs) ? entry.hwi.prs : []),...(Array.isArray(entry?.prs) ? entry.prs : [])];
     const file=pronunciations.find(pr=>typeof pr?.sound?.audio==='string')?.sound?.audio || '';
@@ -1165,7 +1695,8 @@
     const definition = chooseStudyDefinition(studyDefinitions, word);
     const quizDefinition = chooseQuizDefinition(studyDefinitions, word);
     const answerDefinition = chooseAnswerDefinition(studyDefinitions, word);
-    const examples=examplesForTeachingSense(entry,definition);
+    const illustrations=studyIllustrations(word,examplesForTeachingSense(entry,definition));
+    const examples=illustrations.examples;
     if (!definition || !quizDefinition) throw new Error(`No useful quiz definition for ${word}.`);
     return {
       word:String(word || '').toLowerCase(),
@@ -1179,6 +1710,7 @@
       answerDefinition,
       example:examples[0] || '',
       examples,
+      exampleSource:illustrations.exampleSource,
       syllables:String(entry.hwi?.hw || '').replace(/\*/g,'·').replace(/\s+/g,' ').trim(),
       audioUrl:pronunciationAudioUrl(entry),
       origin:wordOrigin(entry),
@@ -1783,17 +2315,19 @@
 
     let direction=session.direction;
     if (direction==='mixed') direction=Math.random()<0.7 ? 'word-def' : 'def-word';
-    if (direction==='word-def' && !target.answerDefinition) direction='def-word';
+    if (direction==='word-def' && !target.answerDefinition) {
+      const error=new Error('No concise meaning-choice prompt is available.');
+      error.code='UNUSABLE_QUESTION';
+      throw error;
+    }
 
     let chosen=[];
     if (direction==='word-def') chosen=candidates.filter(candidate=>candidate.entry.answerDefinition).slice(0,3);
     else chosen=candidates.slice(0,3);
     if (chosen.length<3) {
-      if (direction==='word-def') {
-        direction='def-word';
-        chosen=candidates.slice(0,3);
-      }
-      if (chosen.length<3) throw new Error('Not enough clear answer choices were available for this question.');
+      const error=new Error('Not enough distinct answer choices were available in the selected format.');
+      error.code='UNUSABLE_QUESTION';
+      throw error;
     }
 
     const rawOptions = direction === 'word-def'
@@ -1825,6 +2359,15 @@
       saveState();
       renderQuestion(session.current);
     } catch (error) {
+      // Keep question formats predictable: skip a word that cannot make a good
+      // question in the chosen format rather than silently changing formats.
+      if (error?.code==='UNUSABLE_QUESTION') {
+        session.queue.splice(session.index,1);
+        session.plannedCount=Math.max(0,session.plannedCount-1);
+        persistSession();
+        await presentQuestion();
+        return;
+      }
       if (session?.mode!=='placement' && isUnusableDictionaryError(error) && CURRICULUM_MAP.has(item.word)) {
         markInvalidSeed(item.word);
         session.queue.splice(session.index,1);
@@ -1837,9 +2380,14 @@
       $('loadingQuestion').classList.add('hidden');
       const panel = $('feedbackPanel');
       panel.className = 'feedback';
+      $('feedbackPart').classList.add('hidden');
+      $('feedbackReviewNote').classList.add('hidden');
       panel.classList.remove('hidden');
       $('feedbackHeading').textContent = 'Could not load this question';
-      $('feedbackText').textContent = `${error.message} Check your connection and API key, then try again.`;
+      $('feedbackWord').textContent = 'Question unavailable';
+      $('feedbackDefinition').textContent = `${error.message} Check your connection and API key, then try again.`;
+      $('feedbackExampleLabel').textContent = 'Example';
+      $('feedbackExample').textContent = 'No example for this question.';
       $('wordFacts').innerHTML = '';
       $('detailsButton').classList.add('hidden');
       $('feedbackSaveButton').classList.add('hidden');
@@ -1858,9 +2406,14 @@
     const feedback=$('feedbackPanel');
     feedback.className='feedback hidden';
     $('feedbackHeading').textContent='';
-    $('feedbackText').textContent='';
+    $('feedbackWord').textContent='';
+    $('feedbackPart').textContent='';
+    $('feedbackPart').classList.add('hidden');
+    $('feedbackDefinition').textContent='';
     $('feedbackExample').textContent='';
-    $('feedbackExample').classList.add('hidden');
+    $('feedbackExampleLabel').textContent='Example sentence';
+    $('feedbackReviewNote').textContent='';
+    $('feedbackReviewNote').classList.add('hidden');
     $('wordFacts').innerHTML='';
     setDetailsOpen($('feedbackMore'),false);
     setDetailsOpen($('officialDefinitions'),false);
@@ -1912,6 +2465,32 @@
     if ('open' in section) setDetailsOpen(section,false);
   }
 
+  // Native Web Audio tones are short and optional. Don't autoplay speech or
+  // compete with TalkBack unless the user specifically enables this setting.
+  function playAnswerSound(correct) {
+    if (!settings.answerSounds) return;
+    try {
+      const Context=window.AudioContext || window.webkitAudioContext;
+      if (!Context) return;
+      if (!toneContext) toneContext=new Context();
+      if (toneContext.state==='suspended') void toneContext.resume();
+      const now=toneContext.currentTime;
+      const notes=correct ? [523.25,659.25] : [246.94,196];
+      notes.forEach((hz,index)=>{
+        const oscillator=toneContext.createOscillator();
+        const gain=toneContext.createGain();
+        const start=now+index*.105;
+        oscillator.type='sine';
+        oscillator.frequency.value=hz;
+        gain.gain.setValueAtTime(.0001,start);
+        gain.gain.exponentialRampToValueAtTime(.035,start+.018);
+        gain.gain.exponentialRampToValueAtTime(.0001,start+.11);
+        oscillator.connect(gain); gain.connect(toneContext.destination);
+        oscillator.start(start); oscillator.stop(start+.115);
+      });
+    } catch { /* Audio permission or hardware failure must not block studying. */ }
+  }
+
   function answerQuestion(option, button) {
     if (!session?.current || session.current.answered) return;
     session.current.answered=true;
@@ -1950,13 +2529,19 @@
     const primaryDefinition=q.target.answerDefinition || q.target.quizDefinition || q.target.definition;
     panel.className=`feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
     $('feedbackHeading').textContent=isCorrect ? 'Correct' : 'Not quite';
-    const wordAndPart=q.target.partOfSpeech ? `${q.item.word}, ${q.target.partOfSpeech}` : q.item.word;
-    $('feedbackText').textContent=isCorrect
-      ? `${wordAndPart}. ${primaryDefinition}`
-      : `${wordAndPart}. ${primaryDefinition}${isPlacement ? '' : ' This word will return later.'}`;
+    $('feedbackWord').textContent=q.item.word;
+    $('feedbackPart').textContent=q.target.partOfSpeech || '';
+    $('feedbackPart').classList.toggle('hidden', !q.target.partOfSpeech);
+    $('feedbackDefinition').textContent=primaryDefinition;
     const illustration=String(q.target.example || q.target.examples?.[0] || '').trim();
-    $('feedbackExample').textContent=illustration ? `${looksLikeSentence(illustration) ? 'Example sentence' : 'Usage example'}: ${illustration}` : '';
-    $('feedbackExample').classList.toggle('hidden',!illustration);
+    const hasSentence=looksLikeSentence(illustration);
+    $('feedbackExampleLabel').textContent=illustration
+      ? (hasSentence ? 'Example sentence' : 'Usage example')
+      : 'Example';
+    $('feedbackExample').textContent=illustration || 'No example available for this meaning.';
+    $('feedbackReviewNote').textContent=!isCorrect && !isPlacement ? 'This word will return later for review.' : '';
+    $('feedbackReviewNote').classList.toggle('hidden',isCorrect || isPlacement);
+    playAnswerSound(isCorrect);
     $('wordFacts').innerHTML='';
     addFact('Source','Merriam-Webster Collegiate Dictionary');
     renderOfficialDefinitions(q.target);
@@ -1976,6 +2561,7 @@
       $('feedbackOpenWordButton').classList.remove('hidden');
     }
     $('nextQuestionButton').textContent='Next word';
+    $('nextQuestionButton').setAttribute('aria-label','Next word');
     $('nextQuestionButton').onclick=nextQuestion;
     updateQuestionCounter();
     session.resumeIndex=session.index+1;
@@ -2329,6 +2915,7 @@
     $('thesaurusKey').value = keys.thesaurus || '';
     $('showKeys').checked = false;
     $('appearanceMode').value = settings.appearance || 'system';
+    $('answerSounds').checked=Boolean(settings.answerSounds);
     $('dictionaryKey').type='password'; $('thesaurusKey').type='password';
     const dictionaryReady=Boolean(keys.dictionary);
     const thesaurusReady=Boolean(keys.thesaurus);
@@ -2434,6 +3021,10 @@
     $('homeSavedWordsButton').addEventListener('click',()=>openLibraryWith({source:'personal'}));
     $('homeCollectionsButton').addEventListener('click',()=>switchView('collections'));
     $('homeProgressButton').addEventListener('click',()=>switchView('stats'));
+    qsa('input[name="homeDirection"]').forEach(input=>input.addEventListener('change',()=>{
+      if (input.checked) selectQuestionDirection(input.value);
+    }));
+    $('questionDirection').addEventListener('change',e=>selectQuestionDirection(e.target.value));
     $('lookupForm').addEventListener('submit',e=>{e.preventDefault();lookupWord();});
     $('clearRecentLookupsButton').addEventListener('click',clearRecentLookups);
     $('reviewDueButton').addEventListener('click',()=>{switchView('practice'); beginSession('due');});
@@ -2475,6 +3066,7 @@
     $('historyMoreButton').addEventListener('click',()=>{historyLimit+=25;renderHistory();});
     $('libraryPracticeButton').addEventListener('click',practiceSavedWords);
     $('appearanceMode').addEventListener('change',e=>{ settings={...settings,appearance:e.target.value}; saveState(); applyAppearance(); });
+    $('answerSounds').addEventListener('change',e=>{ settings={...settings,answerSounds:Boolean(e.target.checked)}; saveState(); });
     $('showKeys').addEventListener('change',e=>{ const type=e.target.checked?'text':'password';$('dictionaryKey').type=type;$('thesaurusKey').type=type; });
     $('saveKeysButton').addEventListener('click',saveKeysFromForm);
     $('testKeysButton').addEventListener('click',testKeys);

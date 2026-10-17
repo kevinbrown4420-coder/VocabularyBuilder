@@ -46,7 +46,13 @@
 
       <section class="home-hero" aria-labelledby="homeLevelsHeading">
         <h3 id="homeLevelsHeading">Choose a level</h3>
-        <p class="home-hero-intro">Tap a level and practice starts immediately.</p>
+        <p class="home-hero-intro">Choose how you want to be quizzed, then tap a level.</p>
+        <fieldset id="homeQuestionMode" class="study-mode-control">
+          <legend>Question format for new rounds</legend>
+          <label><input type="radio" name="homeDirection" value="word-def" checked> Show a word, choose its meaning</label>
+          <label><input type="radio" name="homeDirection" value="def-word"> Show a meaning, choose the word</label>
+          <label><input type="radio" name="homeDirection" value="mixed"> Mix both question formats</label>
+        </fieldset>
         <button id="resumeSessionButton" class="resume-strip hidden" type="button">Resume unfinished round</button>
         <div class="level-stack level-stack-primary">
           <button class="level-row" type="button" data-home-level="1"><span class="level-title">Level 1 · Core</span><span id="homeLevel1Progress" class="level-progress-text">Not started</span><span class="level-track" aria-hidden="true"><span id="homeLevel1Bar" class="level-fill"></span></span></button>
@@ -68,7 +74,7 @@
       <section class="builder-panel" aria-labelledby="homeMoreHeading">
         <h3 id="homeMoreHeading">More ways to study</h3>
         <div class="home-explore-grid">
-          <button id="startPracticeButton" type="button">Mixed review</button>
+          <button id="startPracticeButton" type="button">Quick review — new and due words</button>
           <button id="homeDiscoverButton" type="button">Learn unseen words</button>
           <button id="homeCustomButton" type="button">Build a custom round</button>
           <button id="homeSavedWordsButton" type="button">Review saved words</button>
@@ -125,7 +131,7 @@
         <select id="questionDirection">
           <option value="word-def" selected>Word to meaning — Vocabulary Builder style</option>
           <option value="def-word">Definition to word</option>
-          <option value="mixed">Mixed</option>
+          <option value="mixed">Mix both formats</option>
         </select>
         <button id="beginSessionButton" class="primary large" type="button">Start round</button>
         <details class="secondary-options">
@@ -147,8 +153,19 @@
 
         <section id="feedbackPanel" class="feedback hidden" role="region" aria-labelledby="feedbackHeading">
           <h3 id="feedbackHeading" tabindex="-1"></h3>
-          <p id="feedbackText"></p>
-          <p id="feedbackExample" class="feedback-example hidden"></p>
+          <div class="feedback-reading">
+            <h4 id="feedbackWord" class="feedback-word"></h4>
+            <p id="feedbackPart" class="feedback-part hidden"></p>
+            <div class="feedback-learning-item">
+              <p class="feedback-label">Meaning</p>
+              <p id="feedbackDefinition" class="feedback-definition"></p>
+            </div>
+            <div class="feedback-learning-item feedback-example-card">
+              <p id="feedbackExampleLabel" class="feedback-label">Example sentence</p>
+              <p id="feedbackExample" class="feedback-example"></p>
+            </div>
+            <p id="feedbackReviewNote" class="help-text hidden"></p>
+          </div>
           <div class="feedback-actions">
             <button id="nextQuestionButton" class="primary" type="button">Next word</button>
             <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
@@ -359,6 +376,12 @@
         </select>
       </section>
 
+      <section class="builder-panel" aria-labelledby="soundSettingsHeading">
+        <h3 id="soundSettingsHeading">Study sounds</h3>
+        <label class="inline sound-setting" for="answerSounds"><input id="answerSounds" type="checkbox"> Play answer feedback sounds</label>
+        <p class="help-text">Off by default. Short, quiet tones for correct and incorrect answers; they do not replace TalkBack announcements or pronunciation recordings.</p>
+      </section>
+
       <details id="referenceSettings" class="settings-disclosure">
         <summary>Dictionary connection</summary>
         <p class="help-text">The dictionary key is required for practice. The thesaurus key is optional and adds synonyms and antonyms. Keys stay on this device.</p>
@@ -393,7 +416,7 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.4</strong></p>
+        <p><strong>Version 1.5</strong></p>
         <p>Accessibility-first vocabulary practice with a curated 1,155-word study bank and live Merriam-Webster reference data.</p>
       </section>
       <section class="builder-panel">

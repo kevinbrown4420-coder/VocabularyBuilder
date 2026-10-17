@@ -1,68 +1,26 @@
-# Vocabulary Builder v1.4
+# Vocabulary Builder v1.5 — accessibility and study-format polish
 
-Vocabulary Builder is an accessibility-first vocabulary study PWA. v1.4 keeps the Magoosh-style one-word/four-choice operation that tested well and rebuilds the content layer around a much smaller, deliberately useful study bank.
+**Base:** Complete v1.4 source, with the existing Merriam-Webster `/api/lookup.js` and keys workflow unchanged.
 
-## New in v1.4: Teaching context and pronunciation
+## What changed
 
-- Answer feedback presents a relevant Merriam-Webster example immediately below the meaning when available; it prefers complete example sentences. Shorter dictionary illustrations are labeled *Usage example* instead of being described as full sentences.
-- Word Details now includes up to three examples for the taught meaning, syllable divisions, pronunciation playback, and collapsible word-origin information when available.
-- Official Merriam-Webster recorded pronunciation plays when provided; a clearly labeled device-generated speech alternative is used when a recording is missing or cannot play.
-- Examples from unrelated dictionary senses are deliberately excluded. When the dictionary does not provide a suitable example, the app does not fabricate one.
-- This release does not change storage keys, your saved words, or the v1.3 curated curriculum.
+- **Answer review:** Correctness is followed by distinct, finger-explorable word, part-of-speech, meaning, and example areas, then a prominent Next Word control. Optional controls and additional definitions remain after the main answer.
+- **Example sentences:** The app first uses examples from the matching dictionary sense where possible. When unavailable, it can show one of **503 original, hand-written fallback sentences** (covering **458 of the 1,155 curriculum words**, including all 72 Level 4 words). Fallbacks are illustrations written for this app, not quotes attributed to Merriam-Webster. Other words transparently say when no suitable sentence is available. Because some words have multiple senses, users should still flag any sentence that doesn't match the definition being taught.
+- **Study format:** A visible, accessible radio-choice group on the home screen lets you choose **word → meaning**, **meaning → word**, or **mixed formats** before selecting any level. The choice persists for future quick rounds, level rounds, and custom rounds. The app no longer silently changes a word → meaning question to the opposite format when it cannot build suitable answer choices; it skips that question instead. The explicit placement check remains definition → word by design.
+- **Sounds:** New **Play answer feedback sounds** checkbox in Settings. Disabled by default. If enabled, plays two very short quiet pitches for correct/incorrect answers. Does not change spoken pronunciation or TalkBack feedback.
+- **Versioned service worker:** Cache v1.5 so installed phones can retrieve the new assets without clearing their study history.
 
-## Curated study bank
+## Uploading
 
-The former 5,000-word pool mixed curated vocabulary with thousands of generic dictionary headwords. v1.3 replaces it with 1,155 study words selected for vocabulary-building value rather than raw coverage.
+For the **root-only ZIP**, extract and upload all files from the archive at:
+https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
 
-The five levels now emphasize:
+No API upload is needed for this release. The **complete ZIP** also includes the unmodified `api/lookup.js` and other supporting assets for archival backup.
 
-1. **Core** — familiar words worth knowing precisely, commonly confused distinctions, reasoning, writing, and professional language.
-2. **Intermediate** — analytical, academic, communication, and professional vocabulary.
-3. **Advanced** — sophisticated rhetorical, literary, abstract, and professional vocabulary.
-4. **Expert** — difficult but still broadly useful educated vocabulary.
-5. **Challenge** — genuinely rare, literary, or esoteric vocabulary for deliberate expansion.
+## Notes and caveats
 
-Random concrete nouns, anatomy and disease terms, demonyms, obvious compounds, and specialist filler have been removed from ordinary study. Examples of removed filler include `ledger`, `porch`, `intestine`, `molasses`, `passport`, `washer`, and `gastrocnemius`. Words the user saved in earlier versions remain available as Saved words even if they are no longer in the curated curriculum.
+The improved answer choice layout from v1.4 is retained without changing the answer controls. The intermittent TalkBack speech sequence "Next word. Button. Incorrect." remains a test item; its appearance on actual devices has not been reproduced locally. A real Android/TalkBack check is still needed. Browser end-to-end testing was blocked by local browser-navigation restrictions; JavaScript syntax, DOM references, and the example-selection parser were checked locally.
 
-## Better teaching definitions
+## Preserving saved progress
 
-Definitions remain authoritative Merriam-Webster data rather than generated definitions.
-
-- When the Collegiate API includes its learner-oriented `suppl.ldq` definition block, the app prefers that plain-English wording for study.
-- When several exact Merriam-Webster entries match a headword, the app ranks them for teaching usefulness instead of blindly accepting the first response.
-- Learner-oriented entries receive strong preference; clearly medical/anatomical/scientific specialist entries are penalized for ordinary vocabulary study.
-- Circular definitions such as `elegant → marked by elegance` remain excluded.
-- If the best useful definition is too long for an answer choice, the quiz changes direction rather than substituting an obscure secondary sense.
-- Merriam-Webster supplemental examples are retained when available and shown in Word Details and under More about this word after an answer.
-
-## Multiple-choice quality
-
-- Distractors are normally pulled from outside the current round so they do not preview future target definitions.
-- Recently used words and definitions are strongly deprioritized.
-- Duplicate and semantically overlapping meanings are screened.
-- Intentional missed-word repetition remains intact so review still reinforces learning.
-
-## Study operation
-
-- Choose Level 1-5 and practice begins immediately.
-- One word or definition is presented with four large choices.
-- Missed words return later in the same round.
-- Result flow stays concise: Correct / Not quite, meaning, then Next word.
-- Android Back stays inside the installed app and TalkBack receives destination context after navigation.
-
-## Accessibility and appearance
-
-- Part of speech is included in the focused word's accessible name without creating an extra TalkBack stop.
-- System appearance is the default, with explicit Light and Dark overrides.
-- No disabled primary controls and no user-facing `incorrect` result language.
-
-## Persistent data
-
-v1.4 preserves the established storage identifiers and production origin, so API keys, mastery data, Saved words, and study history remain in place across the update.
-
-- `vocabTrackerKeysV01`
-- `vocabTrackerProgressV01`
-- `vocabTrackerSettingsV01`
-- `vocabTrackerActiveSessionV01`
-
-The existing batch-capable `api/lookup.js` does not need replacement for v1.4.
+Storage keys are unchanged: `vocabTrackerKeysV01`, `vocabTrackerProgressV01`, `vocabTrackerSettingsV01`, and `vocabTrackerActiveSessionV01`. Do not clear browser/app data during update. Install onto the **same Vercel origin**.
