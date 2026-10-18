@@ -19,9 +19,10 @@
   const CURRICULUM = (CURRICULUM_ROWS.length ? CURRICULUM_ROWS : WORDS.map(({word,level}) => [word,level,'']))
     .map(([word,level,tags='']) => ({word:String(word).toLowerCase(), level:Number(level)||3, collections:String(tags||'').split(',').filter(Boolean), custom:false}));
   const CURRICULUM_MAP = new Map(CURRICULUM.map(item => [item.word,item]));
+  const REVIEWED_CONTENT = window.VOCAB_REVIEWED_CONTENT_V17 || Object.create(null);
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.6';
+  const APP_VERSION = '1.7';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -877,6 +878,18 @@
     startBuiltSession(built);
   }
 
+  // Some legacy curriculum IDs omit conventional hyphens or spaces. Keep
+  // those stable IDs for existing progress, but ask the dictionary for the
+  // conventional spelling so the word is not silently skipped.
+  const DICTIONARY_SPELLINGS = Object.freeze({
+    fulltime:'full-time', parttime:'part-time', runon:'run-on',
+    deescalate:'de-escalate', cashflow:'cash flow'
+  });
+  function dictionaryLookupSpelling(word) {
+    const value=String(word || '').toLowerCase().trim();
+    return DICTIONARY_SPELLINGS[value] || value;
+  }
+
   async function apiLookup(kind, word, apiKey) {
     const response = await fetch('/api/lookup', {
       method:'POST',
@@ -992,9 +1005,23 @@
     return false;
   }
 
+  // A nested dictionary gloss is not necessarily a complete standalone answer.
+  // Never let fragments, dangling exemplifiers, or raw dictionary markup leak
+  // into multiple-choice options or into lists of other meanings.
+  function isCompleteDefinition(definition) {
+    const value=String(definition || '').trim();
+    if (value.length < 8 || value.length > 180) return false;
+    if (/[,:;–—-]$/.test(value) || /[({]$/.test(value)) return false;
+    if (/\b(?:such as|for example|including|especially|e\.g\.|like the|as in|or other|and other)\s*$/i.test(value)) return false;
+    if (/\b(?:and|or|with|without|from|because|except for|used to)\s*$/i.test(value)) return false;
+    if (/\{[^}]*\}|<[^>]+>/.test(value)) return false;
+    if (/^\s*(?:see also|compare with|see )\b/i.test(value)) return false;
+    return true;
+  }
+
   function isPedagogicallyUsefulDefinition(definition, word) {
     const value=String(definition || '').trim();
-    if (!value || isCircularDefinition(value,word)) return false;
+    if (!isCompleteDefinition(value) || isCircularDefinition(value,word)) return false;
     return definitionTokens(value).length >= 1;
   }
 
@@ -2477,20 +2504,32 @@
     const exact = entries.filter(entry => normalizeWordForMatch(entry.hwi?.hw) === query);
     const stemMatches = entries.filter(entry => Array.isArray(entry.meta?.stems) && entry.meta.stems.some(stem => normalizeWordForMatch(stem) === query));
     const pool = exact.length ? exact : (stemMatches.length ? stemMatches : entries);
-    const entry = [...pool].sort((a,b)=>entryPedagogyScore(b,word)-entryPedagogyScore(a,word))[0];
-    const shortdefs = [...new Set((entry.shortdef || []).map(value => String(value || '').trim()).filter(Boolean))].slice(0,3);
-    const learnerDefinitions=learnerDefinitionsFromEntry(entry,word);
-    const studyDefinitions=[...new Set([...learnerDefinitions,...shortdefs])];
-    const definition = chooseStudyDefinition(studyDefinitions, word);
-    const quizDefinition = chooseQuizDefinition(studyDefinitions, word);
-    const answerDefinition = chooseAnswerDefinition(studyDefinitions, word);
-    const illustrations=studyIllustrations(word,examplesForTeachingSense(entry,answerDefinition),answerDefinition);
+    const reviewed=REVIEWED_CONTENT[query] || null;
+    const preferredPart=String(reviewed?.partOfSpeech || '').toLowerCase();
+    const ranked=[...pool].sort((a,b)=>{
+      const preferred=entry=>preferredPart && String(entry?.fl || '').toLowerCase()===preferredPart ? 100 : 0;
+      return (entryPedagogyScore(b,word)+preferred(b))-(entryPedagogyScore(a,word)+preferred(a));
+    });
+    const entry=ranked[0];
+    const shortdefs=[...new Set((entry.shortdef || []).map(value => String(value || '').trim()).filter(definition=>isPedagogicallyUsefulDefinition(definition,word)))].slice(0,3);
+    // Learner supplements may contain incomplete nested phrases. Keep them
+    // out of the quiz and its distractors entirely.
+    const learnerDefinitions=[];
+    const studyDefinitions=[...new Set([...(reviewed ? [reviewed.definition] : []),...shortdefs])];
+    const definition=reviewed?.definition || chooseStudyDefinition(studyDefinitions,word);
+    const quizDefinition=reviewed?.definition || chooseQuizDefinition(studyDefinitions,word);
+    const answerDefinition=reviewed?.definition || chooseAnswerDefinition(studyDefinitions,word);
+    const illustrations=reviewed
+      ? {examples:[reviewed.example],exampleSource:'reviewed'}
+      : studyIllustrations(word,examplesForTeachingSense(entry,answerDefinition),answerDefinition);
     const examples=illustrations.examples;
-    if (!definition || !quizDefinition) throw new Error(`No useful quiz definition for ${word}.`);
+    if (!definition || !isPedagogicallyUsefulDefinition(quizDefinition,word) || !isConciseAnswerDefinition(answerDefinition)) {
+      throw new Error(`No complete, useful quiz definition for ${word}.`);
+    }
     return {
       word:String(word || '').toLowerCase(),
       headword: normalizeHeadword(entry.hwi?.hw) || word,
-      partOfSpeech: entry.suppl?.ldq?.fl || entry.fl || '',
+      partOfSpeech: reviewed?.partOfSpeech || entry.fl || '',
       shortdefs,
       learnerDefinitions,
       studyDefinitions,
@@ -2504,8 +2543,8 @@
       syllables:String(entry.hwi?.hw || '').replace(/\*/g,'·').replace(/\s+/g,' ').trim(),
       audioUrl:pronunciationAudioUrl(entry),
       origin:wordOrigin(entry),
-      definitionStyle:learnerDefinitions.length ? 'learner' : 'collegiate',
-      source: 'Merriam-Webster Collegiate Dictionary'
+      definitionStyle:reviewed ? 'reviewed-study' : 'collegiate',
+      source: reviewed ? 'Vocabulary Builder teaching definition' : 'Merriam-Webster Collegiate Dictionary'
     };
   }
 
@@ -2533,7 +2572,7 @@
   async function getDictionary(word) {
     const cacheKey = String(word || '').toLowerCase();
     if (transientDictionary.has(cacheKey)) return transientDictionary.get(cacheKey);
-    const data = await apiLookup('dictionary', word, keys.dictionary);
+    const data = await apiLookup('dictionary', dictionaryLookupSpelling(word), keys.dictionary);
     const result=parseDictionaryData(word,data);
     transientDictionary.set(cacheKey,result);
     return result;
@@ -2547,14 +2586,14 @@
     for (let i=0;i<missing.length;i+=8) {
       const chunk=missing.slice(i,i+8);
       let rows;
-      try { rows=await apiLookupBatch('dictionary',chunk,keys.dictionary); }
+      try { rows=await apiLookupBatch('dictionary',chunk.map(dictionaryLookupSpelling),keys.dictionary); }
       catch (error) {
         for (const word of chunk) results.set(word,{error});
         continue;
       }
       const rowMap=new Map(rows.map(row=>[String(row.word||'').toLowerCase(),row]));
       for (const word of chunk) {
-        const row=rowMap.get(word);
+        const row=rowMap.get(dictionaryLookupSpelling(word));
         if (!row || row.error || Number(row.status)>=400) {
           results.set(word,{error:new Error(row?.error || `Lookup failed (${row?.status || 'unknown'}).`)});
           continue;
@@ -3388,7 +3427,7 @@
     $('feedbackReviewNote').classList.toggle('hidden',isCorrect || isPlacement);
     playAnswerSound(isCorrect);
     $('wordFacts').innerHTML='';
-    addFact('Source','Merriam-Webster Collegiate Dictionary');
+    addFact('Definition source', q.target.source || 'Merriam-Webster Collegiate Dictionary');
     // Alternate meanings have a dedicated disclosure in the main reading path.
     $('officialDefinitions').classList.add('hidden');
     if (isPlacement) {

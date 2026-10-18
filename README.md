@@ -1,33 +1,40 @@
-# Vocabulary Builder v1.6 — complete example coverage, clearer senses and TalkBack feedback
+# Vocabulary Builder v1.7 — Curriculum Definition Audit
 
-**Based on:** v1.5 complete source. The Merriam-Webster API handler and environment/key setup are unchanged.
+Based on the complete v1.6 source, with the interface, four-answer layout, audio, and progress-storage keys preserved.
 
-## Changes
+## Editorial changes
 
-- **One example sentence per curriculum word:** Added 697 original, word-specific sentences to the 458 curriculum words already covered in v1.5. All 1,155 words in the built-in curriculum now have at least one prepared, full-sentence example. These are original illustrations for this app, not quotations from Merriam-Webster. Other previously supported words outside the main curriculum also retain their examples.
-- **Better alignment to the tested meaning:** The app prefers a full dictionary illustration only when it can associate that illustration with the meaning being taught; otherwise it uses the prepared example. For particularly tricky, multi-meaning words (such as *sanction, oversight, qualified, draft, resolution, effect, principal, frame,* and *claim*), an explicit meaning guide selects a matching example and identifies a distinct alternative meaning with its own example.
-- **Visible multiple-meaning cue:** When other meanings or distinct dictionary definitions are available, the answer-results screen displays a small disclosure immediately after the example and before the Next Word button. Expand it for alternative definitions and, where a meaning-specific example has been prepared, another sentence. The word-detail page also includes alternate-meaning examples when available.
-- **No empty example cards during practice:** Questions without a complete, reliable example are skipped rather than being presented as an incomplete lesson. This is primarily relevant to custom/saved words outside the built-in 1,155-word curriculum when their dictionary entry supplies no suitable sentence. They remain in the saved-word library.
-- **TalkBack results polish:** The four-choice question layout is unchanged. The old answer-choice controls are removed from the accessibility tree on submission. The result focuses a neutral answer heading, suppresses stale question announcements, and gives the word/part-of-speech, definition and example individual, useful accessible labels without making users stop on tiny separate heading labels. The global announcer has been reduced from assertive to polite. This is a targeted mitigation for the intermittent stale “Incorrect” announcement, **not yet proven to eliminate the issue on an Android device**.
-- **Version bump:** v1.6 service-worker cache identifier and application/package version. Browser/app progress storage keys are unchanged.
+- Reviewed and rewrote a primary teaching definition for **each of the 1,155 built-in curriculum words**, storing it with the corresponding existing example sentence in `study-content.js`. Every primary teaching definition is short enough for the existing four-choice layout: at most 96 characters and 16 words.
+- Primary quiz choices for built-in words now come from these authored teaching definitions rather than potentially obscure or incomplete Merriam-Webster supplementary glosses. Thus the answer choice and post-answer definition are the same, and each is paired with its curriculum sentence.
+- Fixed identified sense mismatches, including `objective` (goal, not impartial), `alternate` (alternative route, not alternating actions), `deduction` (tax deduction, not logical inference), `stress` (emphasis in speech, not psychological strain), `reconciliation` (bank records, not repairing a relationship), `thesis` (academic research work), `prosecution` (legal team), `prospective` (future applicant), `disguise` (noun), `reprimand` (noun), `bargain` (verb), and `intrigue` (verb).
+- Filters external dictionary definitions that appear truncated or incomplete, including phrases ending in **“such as”**, **“including”**, and similar dangling introductions, before those definitions can be used as choices or supplemental meanings.
+- Improved part-of-speech selection for several ambiguous headwords while preserving Merriam-Webster pronunciation recordings and other reference detail.
+- Normalized external dictionary lookup spellings for five older curriculum IDs (`fulltime`, `parttime`, `runon`, `deescalate`, `cashflow`) without changing their progress IDs.
+- Correctly labels original Vocabulary Builder teaching definitions as app-authored rather than crediting them to Merriam-Webster.
 
 ## Uploading to GitHub
 
-Root-only archive: extract the files and upload the six extracted files to the root of `main`:
+The recommended root-only ZIP contains **seven** files. Extract it and upload all seven to:
+
 https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
 
-You do **not** need to visit the API folder or reupload `api/lookup.js` for v1.6.
+`study-content.js` is a **new root file** and must be included. The other six files replace existing root files. Vercel should redeploy after committing to the connected `main` branch. **Do not upload the ZIP without extracting it.**
 
-Complete archive: includes all 14 runtime files, including the unchanged `api/lookup.js`, for backup. The extra working notes and local test scripts are not in either release ZIP.
+The API in `api/lookup.js` is unchanged; no visit to the API folder is necessary. The complete ZIP includes all 15 runtime/project files for backup.
 
-## Quality and testing
+## Validation
 
-- Automated dictionary-bank check: all 1,155 curriculum headwords have built-in full-sentence examples (0 missing).
-- JavaScript syntax checks passed with Node.
-- Local browser test (Chromium, mocked Merriam-Webster responses): starts a level round, displays four answer choices, populates an example after answering, removes old choice buttons, and advances to another question with no JavaScript exception.
-- Local browser test (Chromium, mocked dictionary): `sanction` displays its approval sentence and a separate penalty meaning with its corresponding example, with no JavaScript exception.
-- External Merriam-Webster data and Android TalkBack could not be exercised end-to-end in this environment. Individual sense alignment and pronunciation should continue to be assessed on the live app.
+- 1,155 / 1,155 curated headwords have a definition and matching example sentence in the content bank; no missing entries or duplicate keys.
+- No curated answer definitions exceed 96 characters / 16 words, and automated checks exclude incomplete trailing phrases.
+- A browser-based test exercised every built-in word through the same dictionary parsing function used by the app, deliberately supplying incomplete Merriam-Webster-style data. All 1,155 selected their authored teaching definition and expected sentence; no exceptions.
+- A simulated mobile practice round displayed four distinct buttons, correctly populated the answer-result definition and example, and generated no JavaScript page errors.
+- A word-detail test of `sanction` showed the penalty sense for the core sentence and an independently illustrated approval sense in the expandable list.
+- JavaScript syntax checks passed.
 
-## Preserve your progress
+## Remaining limitations
 
-Do not clear browser storage or app data. The existing keys are unchanged: `vocabTrackerKeysV01`, `vocabTrackerProgressV01`, `vocabTrackerSettingsV01`, and `vocabTrackerActiveSessionV01`. Deploy to the **same Vercel site**.
+This is an in-depth editorial pass on **primary curriculum senses**, not an independent professional lexicography review of all possible meanings. New custom words outside the curated 1,155 still rely on validated Merriam-Webster short definitions; those without dependable sense-linked examples may be skipped. External dictionary API responses and real Android TalkBack behavior were not tested live. Continue reporting any subtle context mismatches, especially in unusual secondary meanings.
+
+## Preserve data
+
+Existing progress and key-storage identifiers remain unchanged: `vocabTrackerKeysV01`, `vocabTrackerProgressV01`, `vocabTrackerSettingsV01`, `vocabTrackerActiveSessionV01`. Avoid clearing app storage.
