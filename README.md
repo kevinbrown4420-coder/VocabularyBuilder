@@ -1,54 +1,63 @@
-# Vocabulary Builder v1.9 — Touch Exploration and Navigation Polish
+# Vocabulary Builder — Version 2.0 Alpha 1
 
-**Scope:** Refine the existing quiz/results navigation without changing the successful four-answer buttons, vocabulary data, offline lessons, or users' saved progress.
+A focused first step toward a more intelligent study engine. This release **does not add new screens, accounts, paywalls, or online dependencies**. It retains v1.9's responsive four-choice quiz, contiguous TalkBack-friendly results rows, and the offline bank of 1,155 teaching definitions/examples.
 
-## What's changed
+## What changed
 
-- **Continuous reading surfaces:** On answer feedback, the word, meaning, and example occupy adjacent, edge-to-edge full-width content rows. Each has padding and a minimum 64 px height, so the accessible reading area is substantially larger than the glyphs themselves. These are real text/heading nodes, **not invisible buttons or clickable overlays**.
-- **One accessible announcement per reading row:** The word (including part of speech where known), the meaning, and the example each have a single accessible name. Visual captions such as "Meaning" are hidden from the accessibility tree to avoid being announced twice. Each row can be reached by keyboard Tab as well as touched and explored with a screen reader. Users can still navigate by headings and content.
-- **Fewer nested region announcements:** Removed redundant quiz-card and results-panel `role="region"` and the extra `role="group"` around answer choices, while retaining the main Practice screen/heading and the four distinct answer buttons.
-- **Predictable first action:** "Next word" now follows immediately after the word, meaning, and example. Other actions and the collapsible additional meanings appear below the main action, instead of interrupting the core study path.
-- **Focus hygiene:** Once an answer is chosen, its button is removed from the accessibility tree and blurred, and focus moves to the results heading. Next Word focuses the new prompt. This may reduce TalkBack's lingering old feedback, but the intermittent "Incorrect" speech still needs real-device confirmation.
-- **Offline app shell:** Service worker cache increments to v1.9 to serve the updated HTML, CSS and JS together offline. Optional dictionary service remains unchanged.
+- **Stronger distractor selection:** draws from a broader set of candidate words instead of the previous 12-word limit, and balances question difficulty, definition style, approximate answer length, level, and study topic when available.
+- **Fairer questions:** excludes a conservative group of near-equivalent words (e.g. *assume/presume*, *adequate/sufficient*, *infer/deduce*) from each other's questions. Screens alternate meanings where explicitly available and avoids nearly identical wrong options.
+- **Better consistency:** prioritizes similarly structured answer choices for word-to-meaning questions (e.g. a short action definition against other action definitions) so the correct choice is less conspicuous.
+- **Faster repeat generation:** locally reviewed dictionary entries are reused across a session rather than reconstructed for every prospective answer.
+- **Repeatable offline tests:** `npm test` now validates all 1,155 teaching entries and creates all 2,310 fixed-direction questions without sending any API requests, verifying saved-progress compatibility and key screen markup.
+- **Version reporting:** About screen reports `2.0 alpha`, and the service worker uses a new v20a cache.
 
-## Unchanged
+## What deliberately did not change
 
-- All 1,155 curated teaching definitions, examples and vocabulary levels.
-- Four-answer quiz layout, option selection and review scheduling.
-- No registration or API key required for built-in offline practice.
-- Existing progress and settings storage keys.
-- `api/lookup.js` (no need to update the API folder), dictionary recording options, and optional answer sounds.
+- Same four answer buttons, same word/meaning/example/Next Word reading sequence, same TalkBack-friendly result surfaces.
+- Same vocabulary bank (`curriculum.js` and `study-content.js` have not changed).
+- Same mastery points, intervals, answer statistics, and saved progress keys: `vocabTrackerProgressV01`, `vocabTrackerSettingsV01`, and `vocabTrackerActiveSessionV01`.
+- No new account, registration requirement, analytics, microtransactions, tracking, or new paid services.
+- The existing `api/lookup.js` is unchanged and not necessary for built-in offline practice.
 
-## Updating GitHub main
+## Installation
 
-Extract the **root-files ZIP** and upload these six root files:
+Extract **v2.0-alpha1-root-files.zip**. Upload its **seven extracted files** into the main GitHub repository root, replacing matching files:
 
 - `app.js`
 - `index.html`
-- `styles.css`
 - `sw.js`
 - `package.json`
 - `README.md`
+- `test-quality.cjs` (new; an automated test, not loaded by the app)
+- `CHANGELOG.md` (new; release and accessibility testing notes)
 
-Upload page: https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
+GitHub main upload: https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
 
-Only six root files are needed. The complete archive is a backup of the same full project. Do not upload the ZIP itself.
+You do not need to touch `api/`, `styles.css`, `curriculum.js`, `study-content.js`, icons, or the manifest. An updated Vercel deployment should be triggered by committing the root files to main if the existing GitHub integration is still active.
 
-## Verification done
+## Testing
 
-- All 1,155 words generated correct four-choice questions in both fixed directions (2,310 questions total), with zero network requests in the JS test harness.
-- Browser-tested a mobile-width question -> result -> Next Word flow. No JS errors; focus moved to the result heading and next question prompt.
-- Browser-measured all three reading rows as contiguous and full-width, each at least 64 px tall.
-- Chrome accessibility tree exposed a single named paragraph node for the meaning and example, with no redundant quiz/result region roles.
-- Simulated service-worker install and offline fetch verified all eight offline files cached, no API responses cached, and old app caches removed.
+From a local checkout with Node.js 18 or later, run:
 
-**Still requires device testing:** TalkBack touch exploration on actual Samsung/Android hardware, speaking behavior after wrong answers (especially the intermittent "Incorrect" announcement), JAWS/NVDA/VoiceOver navigation, and reopening the installed PWA after an update. The browser test was run with a self-contained page harness because this test environment blocks navigation to local HTTP URLs.
+```sh
+npm test
+```
 
-## Recommended phone checks
+Verified in an offline JavaScript test harness:
 
-1. Update the app while online; confirm the offline pack is ready in Settings.
-2. Complete one correct and one incorrect question. Slowly move a finger down the word, meaning, example, and Next Word; note any dead zones or repeated speech.
-3. Try swipe-navigation and backtracking around Next Word, optional meanings, and Word Details.
-4. Continue with airplane mode enabled and verify saved progress after reopening.
+- 1,155/1,155 entries: one concise definition and a valid example sentence per word.
+- 1,155/1,155 valid word-to-definition questions.
+- 1,155/1,155 valid definition-to-word questions.
+- Zero network calls.
+- Preexisting progress was loaded and updated without a storage migration.
+- Service worker installs and caches eight essential assets while bypassing API requests.
+- Browser smoke test at mobile width: four answer options, answer feedback, contiguous results reading areas, navigation to Next Word, and no JavaScript errors.
 
-This release adds no analytics, sign-up, microtransactions, or paywalls.
+The tests cannot prove that every possible distractor is linguistically unambiguous. They catch mechanical and known semantic conflicts; further editorial review and real-device TalkBack testing remain necessary.
+
+## Next planned phases
+
+- **Version 2 beta:** meaning-level review state and an optional contextual question format, designed to preserve historic progress.
+- **Public release preparation:** progress backup validation, broader screen-reader testing (TalkBack, VoiceOver, JAWS, NVDA), and independent tester feedback.
+
+See `CHANGELOG.md` for the change history and accessibility QA log.

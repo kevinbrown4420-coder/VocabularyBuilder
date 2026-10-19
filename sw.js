@@ -1,5 +1,5 @@
 // Versioned, self-contained app shell. Never cache API responses or personal keys.
-const CACHE = 'vocab-builder-static-v19';
+const CACHE = 'vocab-builder-static-v20a';
 const PREFIX = 'vocab-builder-';
 const ASSETS = [
   '/index.html','/styles.css','/curriculum.js','/study-content.js',

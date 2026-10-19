@@ -1,10 +1,11 @@
 {
   "name": "accessible-vocabulary-builder",
-  "version": "1.9.0",
+  "version": "2.0.0-alpha.1",
   "private": true,
   "description": "Offline-first accessible vocabulary builder with optional dictionary enhancements.",
   "scripts": {
-    "start": "node dev-server.js"
+    "start": "node dev-server.js",
+    "test": "node test-quality.cjs"
   },
   "engines": {
     "node": ">=18"

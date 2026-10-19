@@ -22,7 +22,7 @@
   const REVIEWED_CONTENT = window.VOCAB_REVIEWED_CONTENT_V17 || Object.create(null);
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.9';
+  const APP_VERSION = '2.0-alpha';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -2577,13 +2577,15 @@
     }
   }
 
+  const localDictionaryCache=new Map();
   function localDictionary(word) {
     const normalized=String(word || '').trim().toLowerCase();
+    if (localDictionaryCache.has(normalized)) return localDictionaryCache.get(normalized);
     const reviewed=REVIEWED_CONTENT[normalized];
     if (!reviewed || !looksLikeSentence(reviewed.example)) return null;
     const primary=String(reviewed.definition || '').trim();
     if (!isPedagogicallyUsefulDefinition(primary,normalized)) return null;
-    return {
+    const entry={
       word:normalized,
       headword:normalized,
       partOfSpeech:reviewed.partOfSpeech || '',
@@ -2595,6 +2597,8 @@
       definitionStyle:'reviewed-study', source:'Vocabulary Builder teaching definition',
       local:true
     };
+    localDictionaryCache.set(normalized,entry);
+    return entry;
   }
 
   // Enrich word DETAILS on demand, never the quiz. A failed online request
@@ -3135,17 +3139,105 @@
     return (Array.isArray(b?.collections) ? b.collections : []).filter(value => left.has(value)).length;
   }
 
-  function candidateScore(targetItem, targetEntry, candidateItem, candidateEntry, similarity) {
+  // A small, intentionally conservative list of near-equivalent words.
+  // These are useful to study together, but unfair as unqualified multiple-choice
+  // answers: the same short definition could reasonably fit either word.
+  const NEAR_EQUIVALENT_GROUPS = [
+    ['adequate','sufficient'], ['assume','presume'], ['infer','deduce'],
+    ['alleviate','ameliorate'], ['obvious','apparent','evident'],
+    ['inevitable','ineluctable'], ['meticulous','fastidious','scrupulous'],
+    ['candid','frank'], ['ambiguous','equivocal'], ['plausible','credible'],
+    ['perfunctory','cursory'], ['reluctant','hesitant'], ['laconic','succinct','concise'],
+    ['reticent','taciturn'], ['diminish','reduce','decrease'],
+    ['abrogate','repeal','rescind'], ['encomium','panegyric'],
+    ['capricious','fickle'], ['disparity','inequality'],
+    ['obdurate','intransigent'], ['articulate','eloquent'],
+    ['impecunious','destitute'], ['tranquil','serene'],
+    ['obfuscate','obscure'], ['superfluous','unnecessary'],
+    ['ostentatious','pretentious'], ['insidious','subtle'],
+    ['pragmatic','practical'], ['assiduous','diligent'],
+    ['lucid','clear'], ['dogmatic','inflexible'],
+    ['defer','postpone'], ['bolster','reinforce']
+  ];
+  const NEAR_EQUIVALENT = new Map();
+  for (const group of NEAR_EQUIVALENT_GROUPS) {
+    for (const word of group) {
+      if (!NEAR_EQUIVALENT.has(word)) NEAR_EQUIVALENT.set(word,new Set());
+      for (const other of group) if (other!==word) NEAR_EQUIVALENT.get(word).add(other);
+    }
+  }
+  function nearEquivalentWords(left,right) {
+    const a=normalizeWordForMatch(left), b=normalizeWordForMatch(right);
+    return a===b || sameWordFamily(a,b) || Boolean(NEAR_EQUIVALENT.get(a)?.has(b));
+  }
+
+  // A conservative grammatical-form hint inferred from the teaching definition.
+  // An uncertain hint stays unknown; never display it as a claimed part of speech.
+  function answerKind(entry) {
+    const part=String(entry?.partOfSpeech || '').toLowerCase();
+    if (/^(?:noun|verb|adjective|adverb)$/.test(part)) return part;
+    const def=String(entry?.answerDefinition || entry?.quizDefinition || '').trim();
+    if (/^to\s+[a-z]+\b/i.test(def)) return 'verb';
+    if (/^(?:a|an|the)\s+(?:act|process|state|quality|condition|person|individual|thing|amount|ability|practice|belief|idea|feeling|form|period|system|method|event|place|situation|agreement|statement|expression|group|study|field|attitude|word|type|kind|result|difference|relationship|reason|purpose|action|change|tendency|position)\b/i.test(def)) return 'noun';
+    if (/^(?:characterized by|marked by|having|showing|being|able to|capable of|likely to|relating to|based on|free from|lacking|inclined to)\b/i.test(def)) return 'adjective';
+    return '';
+  }
+
+  function clashesWithAnotherMeaning(target, candidate, direction) {
+    // Reject a candidate that would fit any explicitly supplied alternate
+    // meaning of the question word, or whose alternate meaning fits the prompt.
+    const targetMeanings=(target.alternateMeanings || []).map(x=>x.definition);
+    const candidateMeanings=(candidate.alternateMeanings || []).map(x=>x.definition);
+    const candidateMain=candidate.answerDefinition || candidate.quizDefinition;
+    const targetMain=target.answerDefinition || target.quizDefinition;
+    if (targetMeanings.some(other=>definitionSimilarity(other,candidateMain)>=0.34)) return true;
+    if (direction==='def-word' && candidateMeanings.some(other=>definitionSimilarity(other,targetMain)>=0.34)) return true;
+    return false;
+  }
+
+  function definitionShape(entry) {
+    const text=String(entry?.answerDefinition || entry?.quizDefinition || '').trim();
+    if (/^to\s+/i.test(text)) return 'action';
+    if (/^(?:a|an|the|someone|something|one who)\s+/i.test(text)) return 'thing';
+    if (/^(?:in a|in an|in the|with a)\s+/i.test(text)) return 'manner';
+    return 'description';
+  }
+
+  function candidateScore(targetItem, targetEntry, candidateItem, candidateEntry, similarity, direction) {
     let score=0;
-    if (targetEntry.partOfSpeech && candidateEntry.partOfSpeech && targetEntry.partOfSpeech===candidateEntry.partOfSpeech) score += 5;
+    const targetKind=answerKind(targetEntry), candidateKind=answerKind(candidateEntry);
+    if (targetKind && candidateKind) score += targetKind===candidateKind ? 10 : -10;
+    if (direction==='word-def') {
+      score += definitionShape(targetEntry)===definitionShape(candidateEntry) ? 11 : -9;
+    }
     const levelDifference=Math.abs((targetItem.level||3)-(candidateItem.level||3));
-    if (levelDifference===0) score += 3;
-    else if (levelDifference===1) score += 2;
+    score += levelDifference===0 ? 5 : levelDifference===1 ? 3 : 0;
     const sharedCollections=sharedCollectionCount(targetItem,candidateItem);
-    if (sharedCollections===1) score += 2;
-    else if (sharedCollections>=2) score += 1;
-    score += Math.max(0, 2 - similarity*4);
+    score += Math.min(2,sharedCollections)*2;
+    // Moderate conceptual overlap makes questions less trivial; near-duplicates
+    // were rejected separately as unsafe rather than rewarded here.
+    if (similarity>0 && similarity<0.32) score+=2.5+(0.32-Math.abs(similarity-0.14))*2;
+    const answerLength=String(targetEntry.answerDefinition || '').length;
+    const otherLength=String(candidateEntry.answerDefinition || '').length;
+    if (direction==='word-def') {
+      score+=Math.max(0,5-Math.abs(answerLength-otherLength)/12);
+    } else {
+      score+=Math.max(0,4-Math.abs(targetItem.word.length-candidateItem.word.length));
+    }
     return score;
+  }
+
+  function chooseBalancedDistractors(candidates, direction) {
+    const selected=[];
+    for (const candidate of candidates) {
+      if (selected.length===3) break;
+      // Prevent nearly duplicate wrong choices and repeated word families.
+      if (selected.some(other=>nearEquivalentWords(other.item.word,candidate.item.word))) continue;
+      if (direction==='word-def' && selected.some(other =>
+          definitionSimilarity(other.entry.answerDefinition,candidate.entry.answerDefinition)>=0.45)) continue;
+      selected.push(candidate);
+    }
+    return selected;
   }
 
   function recentlyUsedDefinition(definition) {
@@ -3188,11 +3280,16 @@
     const nearLevel=items=>shuffle(items.filter(candidate=>Math.abs((candidate.level||3)-(item.level||3))===1));
     const otherLevel=items=>shuffle(items.filter(candidate=>Math.abs((candidate.level||3)-(item.level||3))>1));
     // Prefer words outside the current round so a distractor never previews a future target's definition.
+    // Draw from more than a dozen words. Balance the level buckets so easy
+    // same-level answers do not crowd out more convincing alternatives.
     const candidateItems=[
-      ...sameLevel(backupFresh),...nearLevel(backupFresh),...otherLevel(backupFresh),
-      ...sameLevel(backupRecent),...nearLevel(backupRecent),...otherLevel(backupRecent),
-      ...sessionFresh,...sessionRecent
-    ].slice(0,12);
+      ...sameLevel(backupFresh).slice(0,70),
+      ...nearLevel(backupFresh).slice(0,36),
+      ...otherLevel(backupFresh).slice(0,12),
+      ...sameLevel(backupRecent).slice(0,12),
+      ...nearLevel(backupRecent).slice(0,8),
+      ...sessionFresh.slice(0,16),...sessionRecent.slice(0,8)
+    ].slice(0,155);
     const batchWords=[item.word,...candidateItems.map(candidate=>candidate.word)];
     const loaded=await getDictionaryBatch(batchWords);
     const targetResult=loaded.get(String(item.word).toLowerCase());
@@ -3205,6 +3302,13 @@
       throw error;
     }
 
+    let direction=session.direction;
+    if (direction==='mixed') direction=Math.random()<0.7 ? 'word-def' : 'def-word';
+    if (direction==='word-def' && !target.answerDefinition) {
+      const error=new Error('No concise meaning-choice prompt is available.');
+      error.code='UNUSABLE_QUESTION';
+      throw error;
+    }
     const candidates=[];
     const seenDefinitions=new Set([String(target.quizDefinition||'').toLowerCase().trim()]);
     for (const candidate of candidateItems) {
@@ -3216,32 +3320,27 @@
       const entry=result.entry;
       if (!entry.quizDefinition) continue;
       if (normalizeWordForMatch(entry.headword)===normalizeWordForMatch(target.headword)) continue;
+      if (nearEquivalentWords(item.word,candidate.word)) continue;
       const normalizedDefinition=String(entry.quizDefinition||'').toLowerCase().trim();
       if (!normalizedDefinition || seenDefinitions.has(normalizedDefinition)) continue;
       const similarity=definitionSimilarity(target.quizDefinition,entry.quizDefinition);
-      if (similarity>0.32) continue;
+      if (similarity>=0.32) continue;
       if (sharedCollectionCount(item,candidate)>=2 && similarity>0.12) continue;
+      if (clashesWithAnotherMeaning(target,entry,direction)) continue;
       seenDefinitions.add(normalizedDefinition);
       const recentWord=recentOptionWords.has(String(candidate.word).toLowerCase());
       const recentDefinition=recentlyUsedDefinition(entry.quizDefinition);
-      let score=candidateScore(item,target,candidate,entry,similarity);
-      if (recentWord) score-=8;
-      if (recentDefinition) score-=10;
+      let score=candidateScore(item,target,candidate,entry,similarity,direction);
+      if (recentWord) score-=10;
+      if (recentDefinition) score-=12;
       candidates.push({item:candidate,entry,similarity,score,recentWord,recentDefinition});
     }
     candidates.sort((a,b)=>b.score-a.score);
 
-    let direction=session.direction;
-    if (direction==='mixed') direction=Math.random()<0.7 ? 'word-def' : 'def-word';
-    if (direction==='word-def' && !target.answerDefinition) {
-      const error=new Error('No concise meaning-choice prompt is available.');
-      error.code='UNUSABLE_QUESTION';
-      throw error;
-    }
-
-    let chosen=[];
-    if (direction==='word-def') chosen=candidates.filter(candidate=>candidate.entry.answerDefinition).slice(0,3);
-    else chosen=candidates.slice(0,3);
+    const chosen=chooseBalancedDistractors(
+      direction==='word-def' ? candidates.filter(candidate=>candidate.entry.answerDefinition) : candidates,
+      direction
+    );
     if (chosen.length<3) {
       const error=new Error('Not enough distinct answer choices were available in the selected format.');
       error.code='UNUSABLE_QUESTION';
