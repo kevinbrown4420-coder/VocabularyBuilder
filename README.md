@@ -1,40 +1,54 @@
-# Vocabulary Builder v1.7 — Curriculum Definition Audit
+# Vocabulary Builder v1.8 — Offline-First Practice
 
-Based on the complete v1.6 source, with the interface, four-answer layout, audio, and progress-storage keys preserved.
+**Purpose:** Keep the accessible four-choice study experience intact, make the full 1,155-word reviewed curriculum available without registration, a dictionary API key, or an ongoing connection, and preserve existing local progress.
 
-## Editorial changes
+## What changed
 
-- Reviewed and rewrote a primary teaching definition for **each of the 1,155 built-in curriculum words**, storing it with the corresponding existing example sentence in `study-content.js`. Every primary teaching definition is short enough for the existing four-choice layout: at most 96 characters and 16 words.
-- Primary quiz choices for built-in words now come from these authored teaching definitions rather than potentially obscure or incomplete Merriam-Webster supplementary glosses. Thus the answer choice and post-answer definition are the same, and each is paired with its curriculum sentence.
-- Fixed identified sense mismatches, including `objective` (goal, not impartial), `alternate` (alternative route, not alternating actions), `deduction` (tax deduction, not logical inference), `stress` (emphasis in speech, not psychological strain), `reconciliation` (bank records, not repairing a relationship), `thesis` (academic research work), `prosecution` (legal team), `prospective` (future applicant), `disguise` (noun), `reprimand` (noun), `bargain` (verb), and `intrigue` (verb).
-- Filters external dictionary definitions that appear truncated or incomplete, including phrases ending in **“such as”**, **“including”**, and similar dangling introductions, before those definitions can be used as choices or supplemental meanings.
-- Improved part-of-speech selection for several ambiguous headwords while preserving Merriam-Webster pronunciation recordings and other reference detail.
-- Normalized external dictionary lookup spellings for five older curriculum IDs (`fulltime`, `parttime`, `runon`, `deescalate`, `cashflow`) without changing their progress IDs.
-- Correctly labels original Vocabulary Builder teaching definitions as app-authored rather than crediting them to Merriam-Webster.
+- **All five curriculum levels work from local teaching content.** Quizzes now build the target and the incorrect answer choices from `study-content.js`, rather than requesting them from Merriam-Webster. This also covers mixed question formats, quick review, placement, due review, and topic collections.
+- **No API key required for built-in practice.** The setup warning no longer blocks lessons. Optional dictionary/thesaurus keys remain under Settings for additional online lookups, recorded pronunciations, and related words.
+- **Known built-in words can be searched offline.** Word Details shows the curated meaning, example, multiple meanings where available, and the device's speech option where supported. When configured and online, the dictionary can add its recording, syllable breaks, and other reference information without changing the teaching definition or example.
+- **Offline caching is versioned.** The service worker precaches the complete app shell (including `curriculum.js` and `study-content.js`) before activation and serves those assets from its versioned cache. It does not cache API requests, other websites, or personal API keys. The Settings > Offline use disclosure includes a cache readiness check.
+- **Progress stays local.** Existing settings, progress, API keys, and unfinished round keys are unchanged. Saved/custom words are preserved. Existing older sessions containing a custom online word skip that unavailable word while offline, rather than stopping the entire lesson.
+- **Visual UX preserved.** The four answer choices, results layout, sounds, study modes, and navigation were not redesigned.
 
-## Uploading to GitHub
+## What is offline—and what isn't
 
-The recommended root-only ZIP contains **seven** files. Extract it and upload all seven to:
+After the app has been opened while online and its offline pack has installed, all 1,155 built-in words can be studied without internet access. Progress is recorded in the same browser storage as before. Pronunciation uses an offline-installed device voice **if your device supports one**; some devices synthesize speech online. Merriam-Webster recordings, arbitrary-word lookup outside the curated curriculum, and thesaurus services remain **optional online features** that require the relevant user's key.
 
-https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
+A freshly installed browser must connect once to download the app shell. The storage cache may be removed by a browser or user storage-cleanup operation. Manual progress backups remain important because progress does not sync between devices.
 
-`study-content.js` is a **new root file** and must be included. The other six files replace existing root files. Vercel should redeploy after committing to the connected `main` branch. **Do not upload the ZIP without extracting it.**
+## Updating your GitHub `main` branch
 
-The API in `api/lookup.js` is unchanged; no visit to the API folder is necessary. The complete ZIP includes all 15 runtime/project files for backup.
+Use the **root-files ZIP** for the normal v1.7 -> v1.8 update. Unzip it, then upload its five root files:
 
-## Validation
+- `app.js`
+- `index.html`
+- `sw.js`
+- `package.json`
+- `README.md`
 
-- 1,155 / 1,155 curated headwords have a definition and matching example sentence in the content bank; no missing entries or duplicate keys.
-- No curated answer definitions exceed 96 characters / 16 words, and automated checks exclude incomplete trailing phrases.
-- A browser-based test exercised every built-in word through the same dictionary parsing function used by the app, deliberately supplying incomplete Merriam-Webster-style data. All 1,155 selected their authored teaching definition and expected sentence; no exceptions.
-- A simulated mobile practice round displayed four distinct buttons, correctly populated the answer-result definition and example, and generated no JavaScript page errors.
-- A word-detail test of `sanction` showed the penalty sense for the core sentence and an independently illustrated approval sense in the expandable list.
-- JavaScript syntax checks passed.
+Upload page: https://github.com/kevinbrown4420-coder/VocabularyBuilder/upload/main
 
-## Remaining limitations
+Other application files, including `study-content.js`, `curriculum.js`, and `api/lookup.js`, are **unchanged**. Do not upload the ZIP itself. The separate complete ZIP includes all 15 files as a source backup.
 
-This is an in-depth editorial pass on **primary curriculum senses**, not an independent professional lexicography review of all possible meanings. New custom words outside the curated 1,155 still rely on validated Merriam-Webster short definitions; those without dependable sense-linked examples may be skipped. External dictionary API responses and real Android TalkBack behavior were not tested live. Continue reporting any subtle context mismatches, especially in unusual secondary meanings.
+## Device test after deployment
 
-## Preserve data
+1. Open the updated installed app while connected. In Settings > Offline use, confirm it says the offline study pack is ready.
+2. Set airplane mode. Fully close and reopen the app. Practice Level 1 and Level 5, including moving from answer choices to results and on to the next word.
+3. Test Word Details on a built-in word. The curated definition and example should display; recorded pronunciation may not be available offline.
+4. Complete a round, reopen the app, and verify progress persisted. When online again, test the optional reference features if configured.
+5. Do **not** clear site/app data; it holds your personal progress.
 
-Existing progress and key-storage identifiers remain unchanged: `vocabTrackerKeysV01`, `vocabTrackerProgressV01`, `vocabTrackerSettingsV01`, `vocabTrackerActiveSessionV01`. Avoid clearing app storage.
+## Validation performed
+
+- JavaScript syntax checked.
+- All 1,155 curated local entries validated to have a usable teaching definition and example.
+- All 1,155 words generated four distinct valid choices in **each fixed quiz direction** without any API requests in a JavaScript test harness; mixed-format sampling also passed.
+- The service worker's install/activation/fetch logic passed simulated cache tests (precache all required static assets, serve app files while offline, preserve unrelated caches, bypass the API).
+- HTML identifiers are unique; all three required script files are present.
+
+**Not yet tested:** Real installed app in Android airplane mode, TalkBack behavior, browser persistence under low-storage conditions, and the full end-to-end browser navigation path. The local browser test environment blocked navigation, so these cannot be claimed as verified.
+
+## Privacy and future public beta
+
+This release adds **no sign-up, analytics, ads, paywalls, or microtransactions**. It does not require any accounts for built-in lessons. Commercial/public distribution should still be preceded by licensing and content-rights review and accessibility testing with multiple users and screen readers.

@@ -1,34 +1,45 @@
-const CACHE = 'vocab-builder-v17';
-const ASSETS = ['/', '/index.html', '/styles.css', '/curriculum.js', '/study-content.js', '/app.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+// Versioned, self-contained app shell. Never cache API responses or personal keys.
+const CACHE = 'vocab-builder-static-v18';
+const PREFIX = 'vocab-builder-';
+const ASSETS = [
+  '/index.html','/styles.css','/curriculum.js','/study-content.js',
+  '/app.js','/manifest.webmanifest','/icon-192.png','/icon-512.png'
+];
+const ASSET_SET = new Set(ASSETS);
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache=await caches.open(CACHE);
+    // A release is activated only after its entire offline study pack is stored.
+    await cache.addAll(ASSETS.map(path=>new Request(path,{cache:'reload'})));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const names=await caches.keys();
+    await Promise.all(names.filter(name=>name.startsWith(PREFIX) && name!==CACHE).map(name=>caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
-  if (url.origin !== self.location.origin) return;
-
-  event.respondWith((async () => {
-    try {
-      const response = await fetch(event.request);
-      if (response.ok) {
-        const cache = await caches.open(CACHE);
-        cache.put(event.request, response.clone());
-      }
-      return response;
-    } catch {
-      const cached = await caches.match(event.request);
-      if (cached) return cached;
-      if (event.request.mode === 'navigate') return caches.match('/index.html');
-      throw new Error('Offline and resource not cached.');
-    }
-  })());
+  if (event.request.method!=='GET') return;
+  const url=new URL(event.request.url);
+  if (url.origin!==self.location.origin || url.pathname.startsWith('/api/')) return;
+  const path=url.pathname==='/' ? '/index.html' : url.pathname;
+  if (ASSET_SET.has(path)) {
+    // App assets are an atomic version. Never mix network v1.9 files with
+    // cached v1.8 files while the next service worker is installing.
+    event.respondWith(caches.open(CACHE).then(async cache => {
+      const cached=await cache.match(path);
+      return cached || fetch(event.request);
+    }));
+  } else if (event.request.mode==='navigate') {
+    event.respondWith(fetch(event.request).catch(async()=> {
+      const cache=await caches.open(CACHE);
+      return (await cache.match('/index.html')) || Response.error();
+    }));
+  }
 });

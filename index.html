@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#4b1f69">
-  <meta name="description" content="Accessible vocabulary practice with a curated high-value study bank, TalkBack-first navigation, and live Merriam-Webster reference data.">
+  <meta name="description" content="Accessible vocabulary practice with a curated high-value study bank, TalkBack-first navigation, and offline vocabulary lessons.">
   <title>Vocabulary Builder</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
@@ -40,7 +40,7 @@
     <section id="view-home" class="view builder-home" aria-labelledby="homeHeading">
       <h2 id="homeHeading" class="sr-only" tabindex="-1">Practice by level</h2>
       <section id="setupNotice" class="notice compact-notice hidden" aria-labelledby="setupNoticeText">
-        <p id="setupNoticeText">Dictionary setup is needed before practice.</p>
+        <p id="setupNoticeText">Built-in vocabulary lessons work without an account or dictionary key.</p>
         <button id="setupButton" type="button">Set up dictionary</button>
       </section>
 
@@ -143,7 +143,7 @@
 
       <div id="quizArea" class="hidden">
         <p id="questionCounter" class="counter"></p>
-        <div id="loadingQuestion" class="notice hidden" role="status">Loading official dictionary entries…</div>
+        <div id="loadingQuestion" class="notice hidden" role="status">Preparing your vocabulary question…</div>
         <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
           <p id="questionType" class="eyebrow"></p>
           <h3 id="questionPrompt" tabindex="-1"></h3>
@@ -387,8 +387,8 @@
       </section>
 
       <details id="referenceSettings" class="settings-disclosure">
-        <summary>Dictionary connection</summary>
-        <p class="help-text">The dictionary key is required for practice. The thesaurus key is optional and adds synonyms and antonyms. Keys stay on this device.</p>
+        <summary>Optional online dictionaries</summary>
+        <p class="help-text">Built-in study is free and works without registration or API keys. You may add your own Merriam-Webster keys for extra lookups, pronunciation recordings, and synonyms. Those additional services require internet access. Keys stay on this device.</p>
         <div class="settings-form">
           <label for="dictionaryKey">Dictionary API key</label>
           <input id="dictionaryKey" type="password" autocomplete="off" spellcheck="false">
@@ -402,6 +402,12 @@
           <p id="keyStatus" role="status"></p>
           <p><a href="https://dictionaryapi.com/" target="_blank" rel="noopener">Merriam-Webster API Developer Center</a></p>
         </div>
+      </details>
+
+      <details class="settings-disclosure">
+        <summary>Offline use</summary>
+        <p id="offlinePackStatus" role="status">Checking the offline study pack…</p>
+        <p class="help-text">After opening the app online once and letting it install its files, the built-in lessons and your progress work without internet. Device-generated pronunciation requires an installed offline voice; optional dictionary recordings still require internet.</p>
       </details>
 
       <details class="settings-disclosure">
@@ -420,8 +426,8 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.7</strong></p>
-        <p>Accessibility-first vocabulary practice with a curated 1,155-word study bank and live Merriam-Webster reference data.</p>
+        <p><strong>Version 1.8</strong></p>
+        <p>Accessibility-first vocabulary practice with 1,155 built-in definitions and examples available for offline study. Optional online reference information is available with your own keys.</p>
       </section>
       <section class="builder-panel">
         <h3>Navigation</h3>
@@ -429,7 +435,7 @@
       </section>
       <section class="builder-panel">
         <h3>Data and reference content</h3>
-        <p>Progress and API keys remain in this browser's local storage. The 1,155 built-in teaching definitions and example sentences are original educational content. Merriam-Webster provides pronunciation audio and additional reference information, including other dictionary definitions.</p>
+        <p>Study progress stays on this device and does not require an account. The 1,155 built-in teaching definitions and examples are original educational content. Optional dictionary keys also stay on this device. Online Merriam-Webster reference information and recordings are separate from offline practice.</p>
       </section>
     </section>
   </main>

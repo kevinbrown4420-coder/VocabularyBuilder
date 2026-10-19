@@ -22,7 +22,7 @@
   const REVIEWED_CONTENT = window.VOCAB_REVIEWED_CONTENT_V17 || Object.create(null);
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.7';
+  const APP_VERSION = '1.8';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -196,7 +196,19 @@
   }
 
   function isInvalidSeed(word) {
-    return Boolean(progress.invalidSeeds && progress.invalidSeeds[String(word||'').toLowerCase()]);
+    // v1.7 marked some perfectly good curriculum words invalid when external
+    // dictionary requests failed. Offline teaching content supersedes that state.
+    const normalized=String(word||'').toLowerCase();
+    if (REVIEWED_CONTENT[normalized]) return false;
+    return Boolean(progress.invalidSeeds && progress.invalidSeeds[normalized]);
+  }
+
+  function canPracticeWord(item) {
+    const word=String(item?.word || '').toLowerCase();
+    // The curated bank requires neither internet nor a dictionary account.
+    if (REVIEWED_CONTENT[word]) return true;
+    // Custom/legacy words remain optional online additions for now.
+    return Boolean(keys.dictionary && navigator.onLine !== false);
   }
 
   function openLibraryWith({source='all',status='all',collection='all',availability='all'}={}) {
@@ -614,7 +626,7 @@
   function renderHome() {
     qsa('input[name="homeDirection"]').forEach(input=>{input.checked=input.value===preferredDirection();});
     const studyItems = allStudyWords();
-    const activeItems = studyItems.filter(({word}) => !getExistingWordState(word).suspended && !isInvalidSeed(word));
+    const activeItems = studyItems.filter(item => canPracticeWord(item) && !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
     const states = studyItems.map(({word}) => getExistingWordState(word));
     const seen = states.filter(state => state.seen>0);
     const mastered = states.filter(state => state.mastery===4).length;
@@ -633,9 +645,8 @@
     $('reviewMissedButton').classList.toggle('hidden', difficult===0);
     $('homeReviewPanel').classList.toggle('hidden', due===0 && difficult===0);
 
-    const ready=Boolean(keys.dictionary);
-    $('setupNotice').classList.toggle('hidden', ready);
-    if (!ready) $('setupNoticeText').textContent='Dictionary setup is needed before practice.';
+    // Core practice never requires a key or account.
+    $('setupNotice').classList.add('hidden');
     $('resumeSessionButton').classList.toggle('hidden', !hasResumableSession());
 
     for (let level=1; level<=5; level++) {
@@ -696,7 +707,7 @@
     settings = {...settings, sessionSize:size, direction, levels, source, collection, novelty};
     saveState();
 
-    let pool = allStudyWords().filter(w => levels.includes(w.level) && !getExistingWordState(w.word).suspended && !isInvalidSeed(w.word));
+    let pool = allStudyWords().filter(w => levels.includes(w.level) && canPracticeWord(w) && !getExistingWordState(w.word).suspended && !isInvalidSeed(w.word));
     if (source === 'personal') pool = pool.filter(w => isSavedWord(w.word));
     if (source === 'starter') pool = pool.filter(w => !w.custom);
     if (collection !== 'all') pool = pool.filter(w => wordMatchesCollection(w, collection));
@@ -742,7 +753,7 @@
     for (const item of selected) if (!seenWords.has(item.word)) { unique.push(item); seenWords.add(item.word); }
     selected=unique.slice(0,Math.min(size,unique.length));
     if (!selected.length) {
-      const sourceMessage = source==='personal' ? 'No saved words match these filters.' :
+      const sourceMessage = source==='personal' ? 'No saved words with available definitions match these filters. Built-in words work offline; custom words currently need optional online access.' :
         (mode==='due' ? 'No words are due in the selected levels.' : mode==='difficult' ? 'No difficult words match the selected levels.' : 'No matching words are available.');
       showToast(sourceMessage); return null;
     }
@@ -782,7 +793,7 @@
   function buildLevelSession(level) {
     const size=10;
     const recent=recentPracticeWords(100);
-    const pool=allStudyWords().filter(item=>item.level===level && !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
+    const pool=allStudyWords().filter(item=>item.level===level && canPracticeWord(item) && !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
     const fresh=shuffle(pool.filter(item=>getExistingWordState(item.word).seen===0 && !recent.has(item.word)));
     const due=shuffle(pool.filter(item=>{ const st=getExistingWordState(item.word); return st.seen>0 && st.nextDue && st.nextDue<=Date.now(); }));
     const difficult=shuffle(pool.filter(item=>{ const st=getExistingWordState(item.word); return st.wrong>0 && st.correct/(st.correct+st.wrong)<0.7; }));
@@ -801,7 +812,6 @@
   }
 
   async function beginLevelSession(level) {
-    if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
     const built=buildLevelSession(Number(level));
     if (!built) { showToast('No words are available in this level.'); return; }
     switchView('practice',false);
@@ -812,7 +822,7 @@
     const size=10;
     const now=Date.now();
     const recent=recentPracticeWords(100);
-    const pool=allStudyWords().filter(item => !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
+    const pool=allStudyWords().filter(item => canPracticeWord(item) && !getExistingWordState(item.word).suspended && !isInvalidSeed(item.word));
     const fresh=pool.filter(item => getExistingWordState(item.word).seen===0);
     const due=pool.filter(item => { const st=getExistingWordState(item.word); return st.seen>0 && st.nextDue && st.nextDue<=now; });
     const difficult=pool.filter(item => { const st=getExistingWordState(item.word); return st.seen>0 && st.wrong>0 && st.correct/(st.correct+st.wrong)<0.7; });
@@ -844,7 +854,6 @@
   }
 
   async function beginQuickSession(kind='quick') {
-    if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
     const built=buildQuickSession(kind);
     if (!built) {
       showToast(kind==='discover' ? 'No unseen curriculum words are currently available.' : 'No words are available for a quick round.');
@@ -872,7 +881,6 @@
   }
 
   async function beginSession(mode='normal') {
-    if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
     const built = buildSession(mode);
     if (!built) return;
     startBuiltSession(built);
@@ -2569,10 +2577,55 @@
     }
   }
 
+  function localDictionary(word) {
+    const normalized=String(word || '').trim().toLowerCase();
+    const reviewed=REVIEWED_CONTENT[normalized];
+    if (!reviewed || !looksLikeSentence(reviewed.example)) return null;
+    const primary=String(reviewed.definition || '').trim();
+    if (!isPedagogicallyUsefulDefinition(primary,normalized)) return null;
+    return {
+      word:normalized,
+      headword:normalized,
+      partOfSpeech:reviewed.partOfSpeech || '',
+      shortdefs:[], learnerDefinitions:[], studyDefinitions:[primary],
+      definition:primary, quizDefinition:primary, answerDefinition:primary,
+      example:reviewed.example, examples:[reviewed.example], exampleSource:'reviewed',
+      alternateMeanings:alternateMeanings(normalized,primary,[primary]),
+      syllables:'', audioUrl:'', origin:'',
+      definitionStyle:'reviewed-study', source:'Vocabulary Builder teaching definition',
+      local:true
+    };
+  }
+
+  // Enrich word DETAILS on demand, never the quiz. A failed online request
+  // must never remove a locally available definition or example.
+  async function getOptionalReference(word, local) {
+    if (!keys.dictionary || navigator.onLine === false) return local;
+    try {
+      const data=await apiLookup('dictionary',dictionaryLookupSpelling(word),keys.dictionary);
+      const reference=parseDictionaryData(word,data);
+      return {
+        ...local,
+        headword:reference.headword || local.headword,
+        syllables:reference.syllables || local.syllables,
+        audioUrl:reference.audioUrl || '',
+        origin:reference.origin || '',
+        shortdefs:reference.shortdefs || [],
+        studyDefinitions:[...new Set([local.definition,...(reference.studyDefinitions || [])])],
+        alternateMeanings:reference.alternateMeanings?.length ? reference.alternateMeanings : local.alternateMeanings
+      };
+    } catch { return local; }
+  }
+
   async function getDictionary(word) {
-    const cacheKey = String(word || '').toLowerCase();
+    const cacheKey=String(word || '').toLowerCase();
+    const local=localDictionary(cacheKey);
+    if (local) return local;
     if (transientDictionary.has(cacheKey)) return transientDictionary.get(cacheKey);
-    const data = await apiLookup('dictionary', dictionaryLookupSpelling(word), keys.dictionary);
+    if (!keys.dictionary || navigator.onLine === false) {
+      throw new Error('This word is not in the offline curriculum. Online dictionary access is optional in Settings.');
+    }
+    const data=await apiLookup('dictionary',dictionaryLookupSpelling(word),keys.dictionary);
     const result=parseDictionaryData(word,data);
     transientDictionary.set(cacheKey,result);
     return result;
@@ -2581,16 +2634,23 @@
   async function getDictionaryBatch(words) {
     const requested=[...new Set((words || []).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean))];
     const results=new Map();
-    for (const word of requested) if (transientDictionary.has(word)) results.set(word,{entry:transientDictionary.get(word)});
-    const missing=requested.filter(word=>!transientDictionary.has(word));
-    for (let i=0;i<missing.length;i+=8) {
-      const chunk=missing.slice(i,i+8);
+    const remote=[];
+    for (const word of requested) {
+      const local=localDictionary(word);
+      if (local) results.set(word,{entry:local});
+      else if (transientDictionary.has(word)) results.set(word,{entry:transientDictionary.get(word)});
+      else remote.push(word);
+    }
+    if (!remote.length) return results;
+    if (!keys.dictionary || navigator.onLine === false) {
+      for (const word of remote) results.set(word,{error:new Error('Custom words require optional online dictionary access.')});
+      return results;
+    }
+    for (let i=0;i<remote.length;i+=8) {
+      const chunk=remote.slice(i,i+8);
       let rows;
       try { rows=await apiLookupBatch('dictionary',chunk.map(dictionaryLookupSpelling),keys.dictionary); }
-      catch (error) {
-        for (const word of chunk) results.set(word,{error});
-        continue;
-      }
+      catch (error) { for (const word of chunk) results.set(word,{error}); continue; }
       const rowMap=new Map(rows.map(row=>[String(row.word||'').toLowerCase(),row]));
       for (const word of chunk) {
         const row=rowMap.get(dictionaryLookupSpelling(word));
@@ -2602,21 +2662,19 @@
           const entry=parseDictionaryData(word,row.data);
           transientDictionary.set(word,entry);
           results.set(word,{entry});
-        } catch (error) {
-          results.set(word,{error});
-        }
+        } catch (error) { results.set(word,{error}); }
       }
     }
     return results;
   }
 
   async function prefetchSessionDictionary(fromIndex=0) {
-    if (!session?.queue?.length || !keys.dictionary) return;
+    if (!session?.queue?.length || !keys.dictionary || navigator.onLine === false) return;
     const token=++prefetchToken;
     const words=[];
     for (const item of session.queue.slice(fromIndex)) {
       const word=String(item.word||'').toLowerCase();
-      if (word && !transientDictionary.has(word) && !words.includes(word)) words.push(word);
+      if (word && !REVIEWED_CONTENT[word] && !transientDictionary.has(word) && !words.includes(word)) words.push(word);
       if (words.length>=8) break;
     }
     if (!words.length) return;
@@ -2752,6 +2810,7 @@
     details.classList.toggle('hidden',listed.length===0);
     if (!listed.length) details.open=false;
 
+    $('wordRelatedButton').classList.toggle('hidden',!keys.thesaurus || navigator.onLine === false);
     const save=$('wordSaveButton');
     save.classList.toggle('hidden', saved);
     save.textContent='Save word';
@@ -2831,12 +2890,21 @@
     $('wordRelatedButton').textContent='Show synonyms and antonyms';
     $('wordDetailContent').classList.add('hidden');
     $('wordDetailLoading').classList.remove('hidden');
-    $('wordDetailLoading').textContent=`Loading ${normalized}…`;
+    $('wordDetailLoading').textContent=`Opening ${normalized}…`;
     try {
+      // Load local information instantly, even without internet. A configured
+      // reference service can enrich the visible details afterward.
       const dictionary=entry || await getDictionary(normalized);
       currentWordDetail.entry=dictionary;
       renderWordDetail(dictionary);
       $('wordDetailWord').focus();
+      if (localDictionary(normalized) && keys.dictionary && navigator.onLine !== false) {
+        void getOptionalReference(normalized,localDictionary(normalized)).then(enriched=>{
+          if (currentWordDetail?.word!==normalized) return;
+          currentWordDetail.entry=enriched;
+          renderWordDetail(enriched);
+        });
+      }
     } catch(error) {
       $('wordDetailLoading').textContent=`Could not load ${normalized}: ${error.message}`;
       $('wordDetailContent').classList.add('hidden');
@@ -2873,8 +2941,8 @@
   async function showCurrentWordRelated() {
     if (!currentWordDetail) return;
     const panel=$('wordRelatedPanel'); const button=$('wordRelatedButton');
-    if (!keys.thesaurus) {
-      panel.textContent='Related-word access is not configured. Add the Merriam-Webster Thesaurus key in Settings.';
+    if (!keys.thesaurus || navigator.onLine === false) {
+      panel.textContent='Synonyms and antonyms are optional online features. Core practice works offline.';
       panel.classList.remove('hidden'); return;
     }
     button.classList.add('hidden');
@@ -2904,7 +2972,6 @@
   }
 
   function practiceWordNow(word, level=3) {
-    if (!keys.dictionary) { switchView('settings'); $('dictionaryKey').focus(); return; }
     const item = ensureStudyWord(word, level);
     if (!item) return;
     const state = wordState(item.word);
@@ -3024,7 +3091,17 @@
     const status=$('lookupStatus');
     renderLookupSuggestions([]);
     if (!word) { status.textContent='Enter a word to look up.'; input.focus(); return; }
-    if (!keys.dictionary) { status.textContent='Dictionary access is not configured. Open Settings first.'; return; }
+    const builtIn=localDictionary(word);
+    if (builtIn) {
+      rememberLookup(word);
+      status.textContent='';
+      await openWordDetail(word,{entry:builtIn});
+      return;
+    }
+    if (!keys.dictionary || navigator.onLine === false) {
+      status.textContent='This word is outside the built-in curriculum. An optional dictionary key and internet connection are needed to look it up.';
+      return;
+    }
     status.textContent=`Looking up ${raw}…`;
     $('lookupButton').classList.add('hidden');
     try {
@@ -3093,7 +3170,7 @@
   async function makeQuestion(item) {
     const questionPool = session?.mode === 'placement'
       ? CURRICULUM
-      : allStudyWords().filter(word => (!getExistingWordState(word.word).suspended && !isInvalidSeed(word.word)) || word.word===item.word);
+      : allStudyWords().filter(word => (canPracticeWord(word) && !getExistingWordState(word.word).suspended && !isInvalidSeed(word.word)) || word.word===item.word);
 
     const recentOptionWords=new Set((session?.recentOptionWords || []).map(word=>String(word).toLowerCase()));
     const queuedUnique=[];
@@ -3115,7 +3192,7 @@
       ...sameLevel(backupFresh),...nearLevel(backupFresh),...otherLevel(backupFresh),
       ...sameLevel(backupRecent),...nearLevel(backupRecent),...otherLevel(backupRecent),
       ...sessionFresh,...sessionRecent
-    ].slice(0,7);
+    ].slice(0,12);
     const batchWords=[item.word,...candidateItems.map(candidate=>candidate.word)];
     const loaded=await getDictionaryBatch(batchWords);
     const targetResult=loaded.get(String(item.word).toLowerCase());
@@ -3194,6 +3271,16 @@
     $('loadingQuestion').classList.remove('hidden');
     updateQuestionCounter();
     const item = session.queue[session.index];
+    // An unfinished older round may contain custom online words. When offline,
+    // skip those without losing existing progress or the rest of the round.
+    if (!canPracticeWord(item)) {
+      session.queue.splice(session.index,1);
+      session.plannedCount=Math.max(0,session.plannedCount-1);
+      persistSession();
+      showToast(`Skipped ${item.word}: this custom word requires optional online access.`);
+      await presentQuestion();
+      return;
+    }
     try {
       session.current = await makeQuestion(item);
       recordWordHistory(item.word, 'practice');
@@ -3214,7 +3301,7 @@
         session.queue.splice(session.index,1);
         session.plannedCount=Math.max(0,session.plannedCount-1);
         persistSession();
-        showToast(`${item.word} was skipped because no usable Merriam-Webster entry was available.`);
+        showToast(`${item.word} was skipped because no usable teaching entry was available.`);
         await presentQuestion();
         return;
       }
@@ -3226,7 +3313,7 @@
       panel.classList.remove('hidden');
       $('feedbackHeading').textContent = 'Could not load this question';
       $('feedbackWord').textContent = 'Question unavailable';
-      $('feedbackDefinition').textContent = `${error.message} Check your connection and API key, then try again.`;
+      $('feedbackDefinition').textContent = error.message || 'This question is currently unavailable.';
       $('feedbackExampleLabel').textContent = 'Example';
       $('feedbackExample').textContent = 'Question unavailable.';
       $('feedbackOtherMeanings').classList.add('hidden');
@@ -3438,7 +3525,7 @@
       $('luckyGuessButton').classList.add('hidden');
     } else {
       addFact('Mastery',statusOf(state));
-      $('detailsButton').classList.remove('hidden');
+      $('detailsButton').classList.toggle('hidden',!keys.thesaurus || navigator.onLine === false);
       $('luckyGuessButton').classList.toggle('hidden',!isCorrect);
       $('detailsButton').textContent='Show synonyms and antonyms';
       $('feedbackSaveButton').classList.toggle('hidden',isSavedWord(q.item.word));
@@ -3502,7 +3589,7 @@
     button.classList.add('hidden');
     const panel = $('detailsPanel');
     panel.classList.remove('hidden');
-    panel.textContent = 'Loading official thesaurus information…';
+    panel.textContent = 'Loading optional thesaurus information…';
     try {
       const t = await getThesaurus(q.item.word);
       panel.innerHTML = '';
@@ -3795,6 +3882,23 @@
     }
   }
 
+  async function updateOfflinePackStatus() {
+    const indicator=$('offlinePackStatus');
+    if (!indicator) return;
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+      indicator.textContent='Offline installation is unavailable in this browser.';
+      return;
+    }
+    const resources=['/index.html','/styles.css','/curriculum.js','/study-content.js','/app.js'];
+    try {
+      const cache=await caches.open('vocab-builder-static-v18');
+      const available=await Promise.all(resources.map(path=>cache.match(path)));
+      indicator.textContent=available.every(Boolean)
+        ? 'Offline study pack ready: all five levels are stored on this device.'
+        : 'Offline pack is preparing. Open the app while connected, then check again.';
+    } catch { indicator.textContent='Could not verify the offline study pack on this device.'; }
+  }
+
   function renderSettings() {
     $('dictionaryKey').value = keys.dictionary || '';
     $('thesaurusKey').value = keys.thesaurus || '';
@@ -3805,9 +3909,10 @@
     const dictionaryReady=Boolean(keys.dictionary);
     const thesaurusReady=Boolean(keys.thesaurus);
     $('keyStatus').textContent = dictionaryReady
-      ? (thesaurusReady ? 'Dictionary and thesaurus are ready.' : 'Dictionary is ready. Add a thesaurus key only for synonyms and antonyms.')
-      : 'Add a dictionary API key before practice.';
-    setDetailsOpen($('referenceSettings'),!dictionaryReady);
+      ? (thesaurusReady ? 'Optional dictionary and thesaurus keys saved.' : 'Optional dictionary key saved; thesaurus is not configured.')
+      : 'No keys needed for the 1,155 built-in words. Keys are optional for additional reference lookups.';
+    setDetailsOpen($('referenceSettings'),false);
+    void updateOfflinePackStatus();
   }
 
   function saveKeysFromForm() {
@@ -3816,7 +3921,7 @@
     transientDictionary.clear(); transientThesaurus.clear();
     $('keyStatus').textContent = keys.dictionary
       ? (keys.thesaurus ? 'Dictionary and thesaurus are ready.' : 'Dictionary is ready. Thesaurus is optional.')
-      : 'Add a dictionary API key before practice.';
+      : 'Built-in study works offline without an API key.';
     renderHome();
   }
 
@@ -3880,7 +3985,6 @@
   }
 
   function practiceSavedWords() {
-    if (!keys.dictionary) { switchView('settings'); return; }
     settings={...settings,source:'personal',collection:'all',levels:[1,2,3,4,5],sessionSize:10};
     saveState();
     switchView('practice');
@@ -3973,9 +4077,10 @@
   }
 
   function initServiceWorker() {
-    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname))) {
       const hadController=Boolean(navigator.serviceWorker.controller);
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if (currentView==='settings') void updateOfflinePackStatus();
         if (!hadController || updateReloading) return;
         if (currentView==='home' && !session) {
           updateReloading=true;
