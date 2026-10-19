@@ -1,5 +1,5 @@
 // Versioned, self-contained app shell. Never cache API responses or personal keys.
-const CACHE = 'vocab-builder-static-v18';
+const CACHE = 'vocab-builder-static-v19';
 const PREFIX = 'vocab-builder-';
 const ASSETS = [
   '/index.html','/styles.css','/curriculum.js','/study-content.js',
@@ -30,8 +30,8 @@ self.addEventListener('fetch', event => {
   if (url.origin!==self.location.origin || url.pathname.startsWith('/api/')) return;
   const path=url.pathname==='/' ? '/index.html' : url.pathname;
   if (ASSET_SET.has(path)) {
-    // App assets are an atomic version. Never mix network v1.9 files with
-    // cached v1.8 files while the next service worker is installing.
+    // App assets are an atomic release: do not mix newer network files
+    // with the currently cached set while another service worker installs.
     event.respondWith(caches.open(CACHE).then(async cache => {
       const cached=await cache.match(path);
       return cached || fetch(event.request);

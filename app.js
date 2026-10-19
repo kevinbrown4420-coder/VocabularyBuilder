@@ -22,7 +22,7 @@
   const REVIEWED_CONTENT = window.VOCAB_REVIEWED_CONTENT_V17 || Object.create(null);
   const COLLECTION_MAP = new Map(COLLECTIONS.map(item => [item.id,item]));
 
-  const APP_VERSION = '1.8';
+  const APP_VERSION = '1.9';
   const LEVEL_NAMES = {1:'Core',2:'Intermediate',3:'Advanced',4:'Expert',5:'Challenge'};
   const STATUS_NAMES = ['New','Learning','Familiar','Strong','Mastered'];
   const DUE_MS = [0, 86400000, 3*86400000, 10*86400000, 30*86400000];
@@ -3312,10 +3312,13 @@
       $('feedbackReviewNote').classList.add('hidden');
       panel.classList.remove('hidden');
       $('feedbackHeading').textContent = 'Could not load this question';
-      $('feedbackWord').textContent = 'Question unavailable';
-      $('feedbackDefinition').textContent = error.message || 'This question is currently unavailable.';
+      $('feedbackWordText').textContent = 'Question unavailable';
+      $('feedbackWord').setAttribute('aria-label','Question unavailable');
+      $('feedbackDefinitionText').textContent = error.message || 'This question is currently unavailable.';
+      $('feedbackDefinition').setAttribute('aria-label',`Meaning. ${$('feedbackDefinitionText').textContent}`);
       $('feedbackExampleLabel').textContent = 'Example';
-      $('feedbackExample').textContent = 'Question unavailable.';
+      $('feedbackExampleText').textContent = 'Question unavailable.';
+      $('feedbackExample').setAttribute('aria-label','Example. Question unavailable.');
       $('feedbackOtherMeanings').classList.add('hidden');
       $('wordFacts').innerHTML = '';
       $('detailsButton').classList.add('hidden');
@@ -3336,11 +3339,11 @@
     const feedback=$('feedbackPanel');
     feedback.className='feedback hidden';
     $('feedbackHeading').textContent='';
-    $('feedbackWord').textContent='';
+    $('feedbackWordText').textContent='';
     $('feedbackPart').textContent='';
     $('feedbackPart').classList.add('hidden');
-    $('feedbackDefinition').textContent='';
-    $('feedbackExample').textContent='';
+    $('feedbackDefinitionText').textContent='';
+    $('feedbackExampleText').textContent='';
     $('feedbackExample').removeAttribute('aria-label');
     $('feedbackDefinition').removeAttribute('aria-label');
     $('feedbackWord').removeAttribute('aria-label');
@@ -3466,6 +3469,8 @@
     $('questionCard').setAttribute('aria-hidden','true');
     $('questionCard').inert=true;
     $('answerChoices').replaceChildren();
+    // An old answer choice must not stay as TalkBack's active element.
+    if (button && typeof button.blur==='function') button.blur();
     // Clear unrelated previous announcements before moving TalkBack focus.
     $('screenAnnouncer').textContent='';
 
@@ -3496,19 +3501,19 @@
     const primaryDefinition=q.target.answerDefinition || q.target.quizDefinition || q.target.definition;
     panel.className=`feedback hidden ${isCorrect ? 'correct' : 'wrong'}`;
     $('feedbackHeading').textContent=isCorrect ? 'Correct answer' : 'Answer to review';
-    $('feedbackWord').textContent=q.item.word;
+    $('feedbackWordText').textContent=q.item.word;
     $('feedbackWord').setAttribute('aria-label',q.target.partOfSpeech ? `${q.item.word}, ${q.target.partOfSpeech}` : q.item.word);
     $('feedbackPart').textContent=q.target.partOfSpeech || '';
     $('feedbackPart').classList.toggle('hidden', !q.target.partOfSpeech);
-    $('feedbackDefinition').textContent=primaryDefinition;
+    $('feedbackDefinitionText').textContent=primaryDefinition;
     $('feedbackDefinition').setAttribute('aria-label',`Meaning. ${primaryDefinition}`);
     const illustration=String(q.target.example || q.target.examples?.[0] || '').trim();
     const hasSentence=looksLikeSentence(illustration);
     $('feedbackExampleLabel').textContent=illustration
       ? (hasSentence ? 'Example sentence' : 'Usage example')
       : 'Example';
-    $('feedbackExample').textContent=illustration || 'This question was skipped because no suitable example was available.';
-    $('feedbackExample').setAttribute('aria-label',`Example sentence. ${illustration || 'Not available'}`);
+    $('feedbackExampleText').textContent=illustration || 'This question was skipped because no suitable example was available.';
+    $('feedbackExample').setAttribute('aria-label',`${hasSentence ? 'Example sentence' : 'Usage example'}. ${illustration || 'Not available'}`);
     renderAlternateMeanings(q.target);
     $('feedbackReviewNote').textContent=!isCorrect && !isPlacement ? 'This word will return later for review.' : '';
     $('feedbackReviewNote').classList.toggle('hidden',isCorrect || isPlacement);
@@ -3539,7 +3544,11 @@
     session.resumeIndex=session.index+1;
     persistSession();
     panel.classList.remove('hidden');
-    requestAnimationFrame(()=> $('feedbackHeading').focus());
+    requestAnimationFrame(()=> {
+      // The clicked answer is now hidden/inert. Focus only the new result heading,
+      // preventing the previous answer's virtual button from retaining focus.
+      if (!$('feedbackPanel').classList.contains('hidden')) $('feedbackHeading').focus({preventScroll:true});
+    });
     if (!isPlacement) renderHome();
   }
 

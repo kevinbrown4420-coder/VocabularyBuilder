@@ -144,38 +144,42 @@
       <div id="quizArea" class="hidden">
         <p id="questionCounter" class="counter"></p>
         <div id="loadingQuestion" class="notice hidden" role="status">Preparing your vocabulary question…</div>
-        <article id="questionCard" class="question-card hidden" role="region" aria-label="Current vocabulary question" aria-labelledby="questionPrompt">
+        <div id="questionCard" class="question-card hidden">
           <p id="questionType" class="eyebrow"></p>
           <h3 id="questionPrompt" tabindex="-1"></h3>
           <p id="questionContext" class="question-context" aria-hidden="true"></p>
-          <div id="answerChoices" class="answers" role="group" aria-label="Answer choices"></div>
-        </article>
+          <div id="answerChoices" class="answers"></div>
+        </div>
 
-        <section id="feedbackPanel" class="feedback hidden" role="region" aria-label="Answer and explanation" aria-live="off">
+        <section id="feedbackPanel" class="feedback hidden" aria-live="off">
           <h3 id="feedbackHeading" tabindex="-1"></h3>
+          <!-- Each informational row is one full-width, keyboard-readable touch surface.
+               Text and visual label belong to the same accessible object. -->
           <div class="feedback-reading">
-            <h4 id="feedbackWord" class="feedback-word"></h4>
-            <p id="feedbackPart" class="feedback-part hidden" aria-hidden="true"></p>
-            <div class="feedback-learning-item">
-              <p class="feedback-label" aria-hidden="true">Meaning</p>
-              <p id="feedbackDefinition" class="feedback-definition"></p>
-            </div>
-            <div class="feedback-learning-item feedback-example-card">
-              <p id="feedbackExampleLabel" class="feedback-label" aria-hidden="true">Example sentence</p>
-              <p id="feedbackExample" class="feedback-example"></p>
-            </div>
-            <p id="feedbackReviewNote" class="help-text hidden"></p>
+            <h4 id="feedbackWord" class="feedback-word feedback-read-row" tabindex="0">
+              <span id="feedbackWordText"></span>
+              <span id="feedbackPart" class="feedback-part hidden" aria-hidden="true"></span>
+            </h4>
+            <p id="feedbackDefinition" class="feedback-definition feedback-read-row" tabindex="0">
+              <span class="feedback-label" aria-hidden="true">Meaning</span>
+              <span id="feedbackDefinitionText"></span>
+            </p>
+            <p id="feedbackExample" class="feedback-example feedback-read-row" tabindex="0">
+              <span id="feedbackExampleLabel" class="feedback-label" aria-hidden="true">Example sentence</span>
+              <span id="feedbackExampleText"></span>
+            </p>
           </div>
-          <details id="feedbackOtherMeanings" class="feedback-other-meanings hidden">
-            <summary id="feedbackOtherMeaningsLabel">This word has another meaning — explore</summary>
-            <ol id="feedbackOtherMeaningList"></ol>
-          </details>
           <div class="feedback-actions">
             <button id="nextQuestionButton" class="primary" type="button">Next word</button>
             <button id="luckyGuessButton" class="hidden" type="button">Lucky guess — review sooner</button>
             <button id="feedbackSaveButton" type="button">Save word</button>
             <button id="feedbackOpenWordButton" type="button">Word details</button>
           </div>
+          <p id="feedbackReviewNote" class="help-text hidden"></p>
+          <details id="feedbackOtherMeanings" class="feedback-other-meanings hidden">
+            <summary id="feedbackOtherMeaningsLabel">This word has another meaning — explore</summary>
+            <ol id="feedbackOtherMeaningList"></ol>
+          </details>
           <p id="confidenceStatus" class="help-text hidden" role="status"></p>
           <details id="feedbackMore" class="feedback-more">
             <summary>More about this word</summary>
@@ -426,7 +430,7 @@
       <h2 id="aboutHeading" class="sr-only" tabindex="-1">About this app</h2>
       <section class="builder-panel">
         <h3>Vocabulary Builder</h3>
-        <p><strong>Version 1.8</strong></p>
+        <p><strong>Version 1.9</strong></p>
         <p>Accessibility-first vocabulary practice with 1,155 built-in definitions and examples available for offline study. Optional online reference information is available with your own keys.</p>
       </section>
       <section class="builder-panel">
